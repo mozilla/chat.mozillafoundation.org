@@ -21,7 +21,33 @@ class ChannelStoreClass extends EventEmitter {
 
         this.setMaxListeners(11);
 
+        this.emitChange = this.emitChange.bind(this);
+        this.addChangeListener = this.addChangeListener.bind(this);
+        this.removeChangeListener = this.removeChangeListener.bind(this);
+        this.emitMoreChange = this.emitMoreChange.bind(this);
+        this.addMoreChangeListener = this.addMoreChangeListener.bind(this);
+        this.removeMoreChangeListener = this.removeMoreChangeListener.bind(this);
+        this.emitExtraInfoChange = this.emitExtraInfoChange.bind(this);
+        this.addExtraInfoChangeListener = this.addExtraInfoChangeListener.bind(this);
+        this.removeExtraInfoChangeListener = this.removeExtraInfoChangeListener.bind(this);
+        this.emitLeave = this.emitLeave.bind(this);
+        this.addLeaveListener = this.addLeaveListener.bind(this);
+        this.removeLeaveListener = this.removeLeaveListener.bind(this);
+        this.findFirstBy = this.findFirstBy.bind(this);
+        this.get = this.get.bind(this);
+        this.getMember = this.getMember.bind(this);
+        this.getByName = this.getByName.bind(this);
+        this.pSetPostMode = this.pSetPostMode.bind(this);
+        this.getPostMode = this.getPostMode.bind(this);
+
         this.currentId = null;
+        this.postMode = this.POST_MODE_CHANNEL;
+    }
+    get POST_MODE_CHANNEL() {
+        return 1
+    }
+    get POST_MODE_FOCUS() {
+        return 2
     }
     emitChange() {
         this.emit(CHANGE_EVENT);
@@ -230,11 +256,19 @@ class ChannelStoreClass extends EventEmitter {
     isDefault(channel) {
         return channel.name === Constants.DEFAULT_CHANNEL;
     }
+
+    pSetPostMode(mode) {
+        this.postMode = mode;
+    }
+
+    getPostMode() {
+        return this.postMode;
+    }
 }
 
 var ChannelStore = new ChannelStoreClass();
 
-ChannelStore.dispatchToken = AppDispatcher.register(function handleAction(payload) {
+ChannelStore.dispatchToken = AppDispatcher.register((payload) => {
     var action = payload.action;
     var currentId;
 
@@ -243,6 +277,14 @@ ChannelStore.dispatchToken = AppDispatcher.register(function handleAction(payloa
         ChannelStore.setCurrentId(action.id);
         ChannelStore.setLastVisitedName(action.name);
         ChannelStore.resetCounts(action.id);
+        ChannelStore.pSetPostMode(ChannelStore.POST_MODE_CHANNEL);
+        ChannelStore.emitChange();
+        break;
+
+    case ActionTypes.RECIEVED_FOCUSED_POST:
+        const post = action.post_list.posts[action.postId];
+        ChannelStore.setCurrentId(post.channel_id);
+        ChannelStore.pSetPostMode(ChannelStore.POST_MODE_FOCUS);
         ChannelStore.emitChange();
         break;
 

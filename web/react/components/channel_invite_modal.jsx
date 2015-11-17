@@ -105,7 +105,7 @@ export default class ChannelInviteModal extends React.Component {
                 }
 
                 this.setState({inviteError: null, memberIds, nonmembers});
-                AsyncClient.getChannelExtraInfo(true);
+                AsyncClient.getChannelExtraInfo();
             },
             (err) => {
                 this.setState({inviteError: err.message});

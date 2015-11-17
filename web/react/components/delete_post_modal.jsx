@@ -74,10 +74,8 @@ export default class DeletePostModal extends React.Component {
     }
     componentDidMount() {
         $(ReactDOM.findDOMNode(this.refs.modal)).on('show.bs.modal', this.onShow);
-        PostStore.addSelectedPostChangeListener(this.onListenerChange);
     }
     componentWillUnmount() {
-        PostStore.removeSelectedPostChangeListener(this.onListenerChange);
     }
     onListenerChange() {
         var newList = PostStore.getSelectedPost();

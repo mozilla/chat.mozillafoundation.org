@@ -8,6 +8,7 @@ const FilePreview = require('./file_preview.jsx');
 const TutorialTip = require('./tutorial/tutorial_tip.jsx');
 
 const AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
+const EventHelpers = require('../dispatcher/event_helpers.jsx');
 const Client = require('../utils/client.jsx');
 const AsyncClient = require('../utils/async_client.jsx');
 const Utils = require('../utils/utils.jsx');
@@ -176,9 +177,7 @@ export default class CreatePost extends React.Component {
 
         const channel = ChannelStore.get(this.state.channelId);
 
-        PostStore.storePendingPost(post);
-        PostStore.storeDraft(channel.id, null);
-        PostStore.jumpPostsViewToBottom();
+        EventHelpers.emitUserPostedEvent(post);
         this.setState({messageText: '', submitting: false, postError: null, previews: [], serverError: null});
 
         Client.createPost(post, channel,
@@ -190,10 +189,7 @@ export default class CreatePost extends React.Component {
                 member.last_viewed_at = Date.now();
                 ChannelStore.setChannelMember(member);
 
-                AppDispatcher.handleServerAction({
-                    type: ActionTypes.RECIEVED_POST,
-                    post: data
-                });
+                EventHelpers.emitPostRecievedEvent(data);
             },
             (err) => {
                 const state = {};

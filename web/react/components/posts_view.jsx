@@ -2,6 +2,7 @@
 // See License.txt for license information.
 
 const UserStore = require('../stores/user_store.jsx');
+const EventHelpers = require('../dispatcher/event_helpers.jsx');
 const Utils = require('../utils/utils.jsx');
 const Post = require('./post.jsx');
 const Constants = require('../utils/constants.jsx');
@@ -27,11 +28,14 @@ export default class PostsView extends React.Component {
     static get SCROLL_TYPE_BOTTOM() {
         return 2;
     }
-    static get SIDEBAR_OPEN() {
+    static get SCROLL_TYPE_SIDEBAR_OPEN() {
         return 3;
     }
     static get SCROLL_TYPE_NEW_MESSAGE() {
         return 4;
+    }
+    static get SCROLL_TYPE_POST() {
+        return 5;
     }
     isAtBottom() {
         return ((this.refs.postlist.scrollHeight - this.refs.postlist.scrollTop) === this.refs.postlist.clientHeight);
@@ -63,12 +67,7 @@ export default class PostsView extends React.Component {
 
         let renderedLastViewed = false;
 
-        let numToDisplay = this.props.numPostsToDisplay;
-        if (order.length - 1 < numToDisplay) {
-            numToDisplay = order.length - 1;
-        }
-
-        for (let i = numToDisplay; i >= 0; i--) {
+        for (let i = order.length - 1; i >= 0; i--) {
             const post = posts[order[i]];
             const parentPost = posts[post.parent_id];
             const prevPost = posts[order[i + 1]];
@@ -119,6 +118,7 @@ export default class PostsView extends React.Component {
                     posts={posts}
                     hideProfilePic={hideProfilePic}
                     isLastComment={isLastComment}
+                    onClick={() => EventHelpers.emitPostFocusEvent(post.id)} //eslint-disable-line no-loop-func
                 />
             );
 
@@ -180,9 +180,12 @@ export default class PostsView extends React.Component {
                     this.refs.postlist.scrollTop = this.refs.postlist.scrollHeight;
                 }
             });
-        } else if (this.props.scrollType === PostsView.SCROLL_TYPE_POST && this.props.scrollPost) {
+        } else if (this.props.scrollType === PostsView.SCROLL_TYPE_POST && this.props.scrollPostId) {
             window.requestAnimationFrame(() => {
-                const postNode = ReactDOM.findDOMNode(this.refs[this.props.scrollPost]);
+                const postNode = ReactDOM.findDOMNode(this.refs[this.props.scrollPostId]);
+                if (postNode == null) {
+                    return;
+                }
                 postNode.scrollIntoView();
                 if (this.refs.postlist.scrollTop === postNode.offsetTop) {
                     this.refs.postlist.scrollTop -= (this.refs.postlist.offsetHeight / 3);
@@ -190,7 +193,7 @@ export default class PostsView extends React.Component {
                     this.refs.postlist.scrollTop -= (this.refs.postlist.offsetHeight / 3) + (this.refs.postlist.scrollTop - postNode.offsetTop);
                 }
             });
-        } else if (this.props.scrollType === PostsView.SIDEBAR_OPEN) {
+        } else if (this.props.scrollType === PostsView.SCROLL_TYPE_SIDEBAR_OPEN) {
             // If we are at the bottom then stay there
             if (this.wasAtBottom) {
                 this.refs.postlist.scrollTop = this.refs.postlist.scrollHeight;
@@ -230,13 +233,10 @@ export default class PostsView extends React.Component {
         if (this.props.postList !== nextProps.postList) {
             return true;
         }
-        if (this.props.scrollPost !== nextProps.scrollPost) {
+        if (this.props.scrollPostId !== nextProps.scrollPostId) {
             return true;
         }
         if (this.props.scrollType !== nextProps.scrollType && nextProps.scrollType !== PostsView.SCROLL_TYPE_FREE) {
-            return true;
-        }
-        if (this.props.numPostsToDisplay !== nextProps.numPostsToDisplay) {
             return true;
         }
         if (this.props.messageSeparatorTime !== nextProps.messageSeparatorTime) {
@@ -259,7 +259,7 @@ export default class PostsView extends React.Component {
             order = this.props.postList.order;
 
             // Create intro message or top loadmore link
-            if (order.length >= this.props.numPostsToDisplay) {
+            if (this.props.showMoreMessagesTop) {
                 moreMessages = (
                     <a
                         ref='loadmore'
@@ -308,11 +308,13 @@ PostsView.defaultProps = {
 PostsView.propTypes = {
     isActive: React.PropTypes.bool,
     postList: React.PropTypes.object,
-    scrollPost: React.PropTypes.string,
+    scrollPostId: React.PropTypes.string,
     scrollType: React.PropTypes.number,
     postViewScrolled: React.PropTypes.func.isRequired,
     loadMorePostsTopClicked: React.PropTypes.func.isRequired,
-    numPostsToDisplay: React.PropTypes.number,
+    loadMorePostsBottomClicked: React.PropTypes.func.isRequired,
+    showMoreMessagesTop: React.PropTypes.bool,
+    showMoreMessagesBottom: React.PropTypes.bool,
     introText: React.PropTypes.element,
     messageSeparatorTime: React.PropTypes.number
 };

@@ -2,6 +2,7 @@
 // See License.txt for license information.
 
 var AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
+var EventHelpers = require('../dispatcher/event_helpers.jsx');
 var ChannelStore = require('../stores/channel_store.jsx');
 var UserStore = require('../stores/user_store.jsx');
 var PreferenceStore = require('../stores/preference_store.jsx');
@@ -848,17 +849,9 @@ export function updateAddressBar(channelName) {
 }
 
 export function switchChannel(channel) {
-    AppDispatcher.handleViewAction({
-        type: ActionTypes.CLICK_CHANNEL,
-        name: channel.name,
-        id: channel.id
-    });
+    EventHelpers.emitChannelClickEvent(channel)
 
     updateAddressBar(channel.name);
-
-    AsyncClient.getChannels(true, true, true);
-    AsyncClient.getChannelExtraInfo(true);
-    AsyncClient.getPosts(channel.id);
 
     $('.inner__wrap').removeClass('move--right');
     $('.sidebar--left').removeClass('move--right');

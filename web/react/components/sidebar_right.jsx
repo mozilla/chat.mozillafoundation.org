@@ -17,7 +17,6 @@ export default class SidebarRight extends React.Component {
 
         this.plScrolledToBottom = true;
 
-        this.onSelectedChange = this.onSelectedChange.bind(this);
         this.onSearchChange = this.onSearchChange.bind(this);
 
         this.doStrangeThings = this.doStrangeThings.bind(this);
@@ -26,12 +25,10 @@ export default class SidebarRight extends React.Component {
     }
     componentDidMount() {
         SearchStore.addSearchChangeListener(this.onSearchChange);
-        PostStore.addSelectedPostChangeListener(this.onSelectedChange);
         this.doStrangeThings();
     }
     componentWillUnmount() {
         SearchStore.removeSearchChangeListener(this.onSearchChange);
-        PostStore.removeSelectedPostChangeListener(this.onSelectedChange);
     }
     componentWillUpdate() {
         PostStore.jumpPostsViewSidebarOpen();
@@ -62,13 +59,6 @@ export default class SidebarRight extends React.Component {
     }
     componentDidUpdate() {
         this.doStrangeThings();
-    }
-    onSelectedChange(fromSearch) {
-        var newState = getStateFromStores(fromSearch);
-        newState.from_search = fromSearch;
-        if (!Utils.areObjectsEqual(newState, this.state)) {
-            this.setState(newState);
-        }
     }
     onSearchChange() {
         var newState = getStateFromStores();

@@ -1,7 +1,7 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
+var EventHelpers = require('../dispatcher/event_helpers.jsx');
 var ChannelView = require('../components/channel_view.jsx');
 var ChannelLoader = require('../components/channel_loader.jsx');
 var ErrorBar = require('../components/error_bar.jsx');
@@ -26,15 +26,13 @@ var ImportThemeModal = require('../components/user_settings/import_theme_modal.j
 var InviteMemberModal = require('../components/invite_member_modal.jsx');
 
 var AsyncClient = require('../utils/async_client.jsx');
-var Constants = require('../utils/constants.jsx');
-var ActionTypes = Constants.ActionTypes;
 
-function setupChannelPage(props) {
-    AppDispatcher.handleViewAction({
-        type: ActionTypes.CLICK_CHANNEL,
-        name: props.ChannelName,
-        id: props.ChannelId
-    });
+function setupChannelPage(props, team, channel) {
+    if (props.PostId === '') {
+        EventHelpers.emitChannelClickEvent(channel);
+    } else {
+        EventHelpers.emitPostFocusEvent(props.PostId);
+    }
 
     AsyncClient.getAllPreferences();
 

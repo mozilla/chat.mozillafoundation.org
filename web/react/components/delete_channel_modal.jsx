@@ -25,7 +25,6 @@ export default class DeleteChannelModal extends React.Component {
 
         Client.deleteChannel(this.state.channelId,
             function handleDeleteSuccess() {
-                AsyncClient.getChannels(true);
                 window.location.href = TeamStore.getCurrentTeamUrl() + '/channels/town-square';
             },
             function handleDeleteError(err) {

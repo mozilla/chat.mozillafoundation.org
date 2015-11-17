@@ -6,9 +6,7 @@ var ChannelStore = require('../stores/channel_store.jsx');
 var UserStore = require('../stores/user_store.jsx');
 var UserProfile = require('./user_profile.jsx');
 var utils = require('../utils/utils.jsx');
-var client = require('../utils/client.jsx');
-var AsyncClient = require('../utils/async_client.jsx');
-var AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
+var EventHelpers = require('../dispatcher/event_helpers.jsx');
 var Constants = require('../utils/constants.jsx');
 var TextFormatting = require('../utils/text_formatting.jsx');
 var ActionTypes = Constants.ActionTypes;
@@ -23,32 +21,7 @@ export default class SearchResultsItem extends React.Component {
     handleClick(e) {
         e.preventDefault();
 
-        var self = this;
-
-        client.getPost(
-            this.props.post.channel_id,
-            this.props.post.id,
-            function success(data) {
-                AppDispatcher.handleServerAction({
-                    type: ActionTypes.RECIEVED_POST_SELECTED,
-                    post_list: data,
-                    from_search: SearchStore.getSearchTerm()
-                });
-
-                AppDispatcher.handleServerAction({
-                    type: ActionTypes.RECIEVED_SEARCH,
-                    results: null,
-                    is_mention_search: self.props.isMentionSearch
-                });
-            },
-            function success(err) {
-                AsyncClient.dispatchError(err, 'getPost');
-            }
-        );
-
-        var postChannel = ChannelStore.get(this.props.post.channel_id);
-
-        utils.switchChannel(postChannel);
+        EventHelpers.emitPostFocusEvent(this.props.post.id);
     }
 
     render() {
