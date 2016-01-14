@@ -1,49 +1,11 @@
 language: generic
-sudo: required
-services:
-- docker
-env:
-- TRAVIS_DB=mysql
-- TRAVIS_DB=postgres
-before_install:
-    - docker run --name mattermost-mysql -e MYSQL_ROOT_PASSWORD=mostest -e MYSQL_USER=mmuser -e MYSQL_PASSWORD=mostest -e MYSQL_DATABASE=mattermost_test -d mysql:5.7
-    - docker run --name mattermost-postgres -e POSTGRES_USER=mmuser -e POSTGRES_PASSWORD=mostest -d postgres:9.4
-    - sleep 10
-    - docker exec mattermost-postgres psql -c 'create database mattermost_test ;' -U postgres
-    - docker exec mattermost-postgres psql -c 'grant all privileges on database "mattermost_test" to mmuser ;' -U postgres
-script: make dist-travis
-addons:
-  hosts:
-  - 127.0.0.1 dockerhost
-before_deploy:
-    - sudo rm -rf dist/mattermost
-    - sudo chown `whoami` dist/mattermost.tar.gz
-    - sudo chmod 777 dist/mattermost.tar.gz
-    - rvm 1.9.3 do gem install mime-types -v 2.6.2
+sudo: false
 deploy:
-# Github releases, builds only on tags
- - provider: releases
-   api_key:
-     secure: ma8Y0oimU+LB6LTAh8to2E1/ghaDPhcsAFXBrODsHpd4JgxA6HYoEwSEBCJFHSpu/JteclsxSTfp9hcuzw/IOtlwlSAiVoBZ60s24MRKTIAQNtrJ4QrX5wyfAZi+Bcuk/E8NynmoIW5qpaElSAdjgocyjAJIQ5ChMEztglL0cAEBXQRWbWMqSZ0hVLPrKDCIkWIyv3pFxqdLOxktkzxW07r2dlT0hppXR3dCaPJo0nelArS2H3LdN/3Iv6cAddfS27RaZkqDj/PDh6OZr4EguC99TxlVNChIr7nPr3/OiAssbkvEnhlSLeABFO9+7KfutL2WhAjpFXTjtPVq6Qalc8UW0K0gxq//sVfhb1MzjenmdOf06uB2bilQ8kgwHo7dDdRZBqqAtxQ6Q0Ht3SFMj6v/1zVD3s+YX/kWCEbUTHm6r2G/eF794ozcJyU+6j1L8hm6mvf8Mr9XCqBfgpZy6FCLX+9OKdMvX2jY8reo3Xz1PA9R6yzhN08vjku+jW+fsoYrBLd0fY1UGK2uOuvBByCeJzXupd3YpBMjEyRupVxqEj7K0GWOJeml65mkqKSNsHdDSeSjMpb8mwneZyTbdjsxCFQRLcLgpAajFrkk4G2Yz3KfhXSo29XKEGX+EbY5NuP8KmDsBsguPI0zfwv/co0hAY8PIIcehxcdoR9Vb2c=
-   file: dist/mattermost.tar.gz
-   skip_cleanup: true
-   on:
-     repo: mattermost/platform
-     tags: true
-     condition: $TRAVIS_DB = mysql
-
-# S3 deploy for latest master
- - provider: s3
-   access_key_id: AKIAJCO3KJYEGWJIKDIQ
-   secret_access_key:
-     secure: p66X2tJBmKgtcVyPtGgkAwW29IiRojqGA39RjCJkIWNTJ0e/9JvBOiMS2c4a7I4aOads38rsthwdaigBWagDWNH7bGsEZN7B0TszZuFAuU+XGjU5A66MIOfFfzbUg8AnByysr+XG5/bknFIrP/XhM2fbRr6gbYrFUK7TNkpgjFs5u3BzUrz2iTAV8uOpSJqKSnaf0pTZk1EywOK/X8W8ViIjc7Di3FzQcqIW9K3D27N+3rVsv8SRT1hWASVlnG6aThqqebiM8FCGCzAYVgQb3h3Wu8JT5fIz7Qo7A6siVRwNBwWwzP8HkGoinEK32Wsj/fDXk27vjpFQO/+9sV0xfcTbIZA6MnuYWF4rHOT59KcshCWCD3V0FopX57p/dtOzM9+6lxIctAT++izxWoZit/5c5A4633iY1d+RMeTko1POix6MSlxPMRHZUFwSXROgFuWWRpyD6TlUTCST9/wTTd0WDPklAAiYcnuEPW3qCnw0r0xkrA4AwWUXqXdAIwDt5bA27KcjRyY4Fofv9NxH09BNuBTXNPrvnYPZMmaKrv+HOX3NFTreuV6+5LJdhYUxYSBvSWo1jeWIQ5Q9RUdTU0PqmKpMhJKbKey/S4gxCXHg2HR8DwLCcbIZcvneF9yPEAT71YA6zpLKoPVSwWwH97huKSzjpic/RUfFXQOcgCQ=
-   bucket: mattermost-travis-master
-   local_dir: dist
-   acl: public_read
-   region: us-east-1
-   skip_cleanup: true
-   detect_encoding: true
-   on:
-     repo: mattermost/platform
-     branch: master
-     condition: $TRAVIS_DB = mysql
+  - provider: heroku
+    api_key:
+      secure: tW2LbL2R6l+Sr9g3Wfg2FmgJWPignTLPW46OHW2SclD0o3yzpR6ZvRUUosUQJ22KYOZ06Gqn5Pe2iHLNCZJV1v68yKgTQtzNsgYZ/esdN2csCXieO8E5zmnaGv3L/bJyi0xyC95BdZyNmAFIm72I+gQetPAUsjehxpdh4vqKlIMNSVirypZ/tClKBDcznSL/hWqFf3SZzqgjwgOTiRFZGCgA1l6S4RK+XOvmzFHzta9jyoE6VeiDZ5XszTqbgD5QUcbQzdiwf7pCFgG8OEvF8T8ex2+SRXIjIDG4JEYjhcytFGU0jL0591SYGwRqzbgM3fhFr5E1APBHqGNMmvIfQWiGjnj+CuIlH5SvkpzOB6E3wBertyyz9yYoCFNW2s/mMhg1YnWFjGjz7duj20eLxYei6uEG+OVU29Nq//GVxcdLiwUQc7ydwzr6JXU3BHQbvWNiYSnHx3iEHYtheSOBUqvE6pgcBRLKGwsrmahjxTfuB43ImZioNVgJMTpzt4IGgUBy7ENu/AfWXu/+l0vK4/bjX11jLXh1ALMVNu72VtH3opL6efStEF2l7O3TfB+4ca989MuaAthoD20P1O0TQfaoSrWI6dNNUipxg8p3viqCOkJdLA2NEI3ZHR+TqRw7i6ZIjDTIjjSPASW8Y/wYIOgo7KIwqFeiDJorYRraeh0=
+    app:
+      develop: mattermoz-staging
+      master: mattermoz-production
+    on:
+      repo: cadecairos/mattermoz
