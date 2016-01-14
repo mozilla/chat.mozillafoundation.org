@@ -1,14 +1,15 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var Client = require('../utils/client.jsx');
-var AsyncClient = require('../utils/async_client.jsx');
-var Textbox = require('./textbox.jsx');
-var BrowserStore = require('../stores/browser_store.jsx');
-var PostStore = require('../stores/post_store.jsx');
-var PreferenceStore = require('../stores/preference_store.jsx');
+import * as Client from '../utils/client.jsx';
+import * as AsyncClient from '../utils/async_client.jsx';
+import * as EventHelpers from '../dispatcher/event_helpers.jsx';
+import Textbox from './textbox.jsx';
+import BrowserStore from '../stores/browser_store.jsx';
+import PostStore from '../stores/post_store.jsx';
+import PreferenceStore from '../stores/preference_store.jsx';
 
-var Constants = require('../utils/constants.jsx');
+import Constants from '../utils/constants.jsx';
 var KeyCodes = Constants.KeyCodes;
 
 export default class EditPostModal extends React.Component {
@@ -34,7 +35,7 @@ export default class EditPostModal extends React.Component {
             delete tempState.editText;
             BrowserStore.setItem('edit_state_transfer', tempState);
             $('#edit_post').modal('hide');
-            $('#delete_post').modal('show');
+            EventHelpers.showDeletePostModal(PostStore.getPost(this.state.channel_id, this.state.post_id), this.state.comments);
             return;
         }
 
@@ -57,7 +58,7 @@ export default class EditPostModal extends React.Component {
         this.setState({editText: editMessage});
     }
     handleEditKeyPress(e) {
-        if (this.state.ctrlSend === 'false' && e.which === KeyCodes.ENTER && !e.shiftKey && !e.altKey) {
+        if (!this.state.ctrlSend && e.which === KeyCodes.ENTER && !e.shiftKey && !e.altKey) {
             e.preventDefault();
             ReactDOM.findDOMNode(this.refs.editbox).blur();
             this.handleEdit(e);
@@ -79,13 +80,13 @@ export default class EditPostModal extends React.Component {
         $(ReactDOM.findDOMNode(this.refs.modal)).modal('show');
     }
     handleKeyDown(e) {
-        if (this.state.ctrlSend === 'true' && e.keyCode === KeyCodes.ENTER && e.ctrlKey === true) {
+        if (this.state.ctrlSend && e.keyCode === KeyCodes.ENTER && e.ctrlKey === true) {
             this.handleEdit(e);
         }
     }
     onPreferenceChange() {
         this.setState({
-            ctrlSend: PreferenceStore.getPreference(Constants.Preferences.CATEGORY_ADVANCED_SETTINGS, 'send_on_ctrl_enter', {value: 'false'}).value
+            ctrlSend: PreferenceStore.getBool(Constants.Preferences.CATEGORY_ADVANCED_SETTINGS, 'send_on_ctrl_enter')
         });
     }
     componentDidMount() {
@@ -159,6 +160,7 @@ export default class EditPostModal extends React.Component {
                                 onKeyDown={this.handleKeyDown}
                                 messageText={this.state.editText}
                                 createMessage='Edit the post...'
+                                supportsCommands={false}
                                 id='edit_textbox'
                                 ref='editbox'
                             />

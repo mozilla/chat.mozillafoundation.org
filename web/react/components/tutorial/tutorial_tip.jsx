@@ -1,11 +1,11 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const UserStore = require('../../stores/user_store.jsx');
-const PreferenceStore = require('../../stores/preference_store.jsx');
-const AsyncClient = require('../../utils/async_client.jsx');
+import UserStore from '../../stores/user_store.jsx';
+import PreferenceStore from '../../stores/preference_store.jsx';
+import * as AsyncClient from '../../utils/async_client.jsx';
 
-const Constants = require('../../utils/constants.jsx');
+import Constants from '../../utils/constants.jsx';
 const Preferences = Constants.Preferences;
 
 const Overlay = ReactBootstrap.Overlay;
@@ -101,22 +101,24 @@ export default class TutorialTip extends React.Component {
                     <div className={'tip-overlay ' + this.props.overlayClass}>
                         <div className='arrow'></div>
                         {this.props.screens[this.state.currentScreen]}
-                        <div className='tutorial__circles'>{dots}</div>
-                        <div className='text-right'>
-                            <button
-                                className='btn btn-primary'
-                                onClick={this.handleNext}
-                            >
-                                {buttonText}
-                            </button>
-                            <div className='tip-opt'>
-                                {'Seen this before? '}
-                                <a
-                                    href='#'
-                                    onClick={this.skipTutorial}
+                        <div className='tutorial__footer'>
+                            <div className='tutorial__circles'>{dots}</div>
+                            <div className='text-right'>
+                                <button
+                                    className='btn btn-primary'
+                                    onClick={this.handleNext}
                                 >
-                                    {'Opt out of these tips.'}
-                                </a>
+                                    {buttonText}
+                                </button>
+                                <div className='tip-opt'>
+                                    {'Seen this before? '}
+                                    <a
+                                        href='#'
+                                        onClick={this.skipTutorial}
+                                    >
+                                        {'Opt out of these tips.'}
+                                    </a>
+                                </div>
                             </div>
                         </div>
                     </div>

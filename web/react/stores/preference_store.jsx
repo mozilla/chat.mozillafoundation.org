@@ -1,11 +1,12 @@
-// Copyright (c) 2015 Spinpunch, Inc. All Rights Reserved.
+// Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const ActionTypes = require('../utils/constants.jsx').ActionTypes;
-const AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
-const BrowserStore = require('./browser_store.jsx');
-const EventEmitter = require('events').EventEmitter;
-const UserStore = require('../stores/user_store.jsx');
+import Constants from '../utils/constants.jsx';
+const ActionTypes = Constants.ActionTypes;
+import AppDispatcher from '../dispatcher/app_dispatcher.jsx';
+import BrowserStore from './browser_store.jsx';
+import EventEmitter from 'events';
+import UserStore from '../stores/user_store.jsx';
 
 const CHANGE_EVENT = 'change';
 
@@ -22,8 +23,11 @@ class PreferenceStoreClass extends EventEmitter {
         super();
 
         this.getAllPreferences = this.getAllPreferences.bind(this);
+        this.get = this.get.bind(this);
+        this.getBool = this.getBool.bind(this);
+        this.getInt = this.getInt.bind(this);
         this.getPreference = this.getPreference.bind(this);
-        this.getPreferences = this.getPreferences.bind(this);
+        this.getCategory = this.getCategory.bind(this);
         this.getPreferencesWhere = this.getPreferencesWhere.bind(this);
         this.setAllPreferences = this.setAllPreferences.bind(this);
         this.setPreference = this.setPreference.bind(this);
@@ -40,11 +44,51 @@ class PreferenceStoreClass extends EventEmitter {
         return new Map(BrowserStore.getItem('preferences', []));
     }
 
-    getPreference(category, name, defaultValue = '') {
+    get(category, name, defaultValue = '') {
+        const preference = this.getAllPreferences().get(getPreferenceKey(category, name));
+
+        if (!preference) {
+            return defaultValue;
+        }
+
+        return preference.value || defaultValue;
+    }
+
+    getBool(category, name, defaultValue = false) {
+        const preference = this.getAllPreferences().get(getPreferenceKey(category, name));
+
+        if (!preference) {
+            return defaultValue;
+        }
+
+        // prevent a non-false default value from being returned instead of an actual false value
+        if (preference.value === 'false') {
+            return false;
+        }
+
+        return (preference.value !== 'false') || defaultValue;
+    }
+
+    getInt(category, name, defaultValue = 0) {
+        const preference = this.getAllPreferences().get(getPreferenceKey(category, name));
+
+        if (!preference) {
+            return defaultValue;
+        }
+
+        // prevent a non-zero default value from being returned instead of an actual 0 value
+        if (preference.value === '0') {
+            return 0;
+        }
+
+        return parseInt(preference.value, 10) || defaultValue;
+    }
+
+    getPreference(category, name, defaultValue = {}) {
         return this.getAllPreferences().get(getPreferenceKey(category, name)) || defaultValue;
     }
 
-    getPreferences(category) {
+    getCategory(category) {
         return this.getPreferencesWhere((preference) => (preference.category === category));
     }
 
@@ -89,8 +133,8 @@ class PreferenceStoreClass extends EventEmitter {
         return preference;
     }
 
-    emitChange(preferences) {
-        this.emit(CHANGE_EVENT, preferences);
+    emitChange() {
+        this.emit(CHANGE_EVENT);
     }
 
     addChangeListener(callback) {
@@ -105,7 +149,13 @@ class PreferenceStoreClass extends EventEmitter {
         const action = payload.action;
 
         switch (action.type) {
-        case ActionTypes.RECIEVED_PREFERENCES:
+        case ActionTypes.RECIEVED_PREFERENCE: {
+            const preference = action.preference;
+            this.setPreference(preference.category, preference.name, preference.value);
+            this.emitChange();
+            break;
+        }
+        case ActionTypes.RECIEVED_PREFERENCES: {
             const preferences = this.getAllPreferences();
 
             for (const preference of action.preferences) {
@@ -113,7 +163,9 @@ class PreferenceStoreClass extends EventEmitter {
             }
 
             this.setAllPreferences(preferences);
-            this.emitChange(preferences);
+            this.emitChange();
+            break;
+        }
         }
     }
 }

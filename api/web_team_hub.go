@@ -4,7 +4,7 @@
 package api
 
 import (
-	l4g "code.google.com/p/log4go"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/mattermost/platform/model"
 )
 
@@ -95,8 +95,10 @@ func ShouldSendEvent(webCon *WebConn, msg *model.Message) bool {
 			return false
 		}
 	} else {
-		// Don't share a user's view events with other users
+		// Don't share a user's view or preference events with other users
 		if msg.Action == model.ACTION_CHANNEL_VIEWED {
+			return false
+		} else if msg.Action == model.ACTION_PREFERENCE_CHANGED {
 			return false
 		}
 

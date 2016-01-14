@@ -1,3 +1,5 @@
+@charset "UTF-8";
+
 .tip-backdrop {
     background: rgba(black, 0.5);
     position: absolute;
@@ -30,6 +32,14 @@
     &.tip-overlay--sidebar {
         max-width: 75%;
         margin: 50px 0 0 10px;
+        min-height: 310px;
+        .tutorial__footer {
+            position: absolute;
+            width: 100%;
+            bottom: 20px;
+            left: 0;
+            padding: 0 20px;
+        }
         .arrow {
             top: 80px;
             left: -10px;
@@ -81,7 +91,7 @@
         color: #fff;
         @include border-radius(3px);
         border: none;
-        margin-bottom: 10px;
+        margin: 10px 0;
 
         &:hover, &:active, &:focus {
             color: #fff;

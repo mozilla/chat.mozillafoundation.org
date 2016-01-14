@@ -11,7 +11,10 @@ Developer Machine Setup
 		`docker-machine ip dev`
 	3. Add a line to your /etc/hosts that goes `<Docker IP> dockerhost`
 	4. Run `docker-machine env dev` and copy the export statements to your ~/.bash_profile
-2. Download Go (version 1.4.2 or 1.5.1. Final release bits are built with 1.4.2) from http://golang.org/dl/
+2. Download Go 1.5.1 and Node.js using Homebrew
+	1. Download Homebrew from http://brew.sh/
+	2. `brew install go`
+	3. `brew install node`
 3. Set up your Go workspace
 	1. `mkdir ~/go`
 	2. Add the following to your ~/.bash_profile  
@@ -21,20 +24,17 @@ Developer Machine Setup
 		If you don't increase the file handle limit you may see some weird build issues with browserify or npm.  
 	3. Reload your bash profile  
 		`source ~/.bash_profile`
-4. Install Node.js using Homebrew
-	1. Download Homebrew from http://brew.sh/
-	2. `brew install node`
-5. Install Compass
+4. Install Compass
 	1. Run `ruby -v` and check the ruby version is 1.8.7 or higher
 	2. `sudo gem install compass`
-6. Download Mattermost  
+5. Download Mattermost  
 	`cd ~/go`  
 	`mkdir -p src/github.com/mattermost`  
 	`cd src/github.com/mattermost`  
 	`git clone https://github.com/mattermost/platform.git`  
 	`cd platform`
-7. Run unit tests on Mattermost using `make test` to make sure the installation was successful
-8. If tests passed, you can now run Mattermost using `make run`
+6. Run unit tests on Mattermost using `make test` to make sure the installation was successful
+7. If tests passed, you can now run Mattermost using `make run`
 
 Any issues? Please let us know on our forums at: http://forum.mattermost.org
 
@@ -53,24 +53,19 @@ Any issues? Please let us know on our forums at: http://forum.mattermost.org
 		`127.0.0.1 dockerhost`
 3. Install build essentials
 	1. `apt-get install build-essential`
-4. Download Go (version 1.4.2 or 1.5.1. Final release bits are built with 1.4.2) from http://golang.org/dl/
+4. Download Go 1.5.1 from http://golang.org/dl/
 5. Set up your Go workspace and add Go to the PATH
 	1. `mkdir ~/go`
 	2. Add the following to your ~/.bashrc  
 		`export GOPATH=$HOME/go`  
-		`export GOROOT=/usr/local/go`  
-		`export PATH=$PATH:$GOROOT/bin`  
+		`export PATH=$PATH:$GOPATH/bin`  
 		`ulimit -n 8096`  
 		If you don't increase the file handle limit you may see some weird build issues with browserify or npm.  
 	3. Reload your bashrc  
 		`source ~/.bashrc`
-6. Install Node.js
-	1. Download the newest version of the Node.js sources from https://nodejs.org/en/download/
-	2. Extract the contents of the package and cd into the extracted files
-	3. Compile and install Node.js  
-		`./configure`  
-		`make`  
-		`make install`
+6. Install Node.js  
+	`curl -sL https://deb.nodesource.com/setup_5.x | sudo -E bash -`  
+	`sudo apt-get install -y nodejs`
 7. Install Ruby and Compass  
 	`apt-get install ruby`  
 	`apt-get install ruby-dev`  
@@ -83,5 +78,53 @@ Any issues? Please let us know on our forums at: http://forum.mattermost.org
 	`cd platform`
 9. Run unit tests on Mattermost using `make test` to make sure the installation was successful
 10. If tests passed, you can now run Mattermost using `make run`
+
+Any issues? Please let us know on our forums at: http://forum.mattermost.org
+
+### Archlinux ###
+
+1. Install Docker
+	1. `pacman -S docker`
+	2. `gpasswd -a user docker`
+	3. `systemctl enable docker.service`
+	4. `systemctl start docker.service`
+	5. `newgrp docker`
+2. Set up your dockerhost address
+	1. Edit your /etc/hosts file to include the following line
+		`127.0.0.1 dockerhost`
+3. Install Go
+	1. `pacman -S go`
+4. Set up your Go workspace and add Go to the PATH
+	1. `mkdir ~/go`
+	2. Add the following to your ~/.bashrc
+		1. `export GOPATH=$HOME/go`
+		2. `export GOROOT=/usr/lib/go`
+		3. `export PATH=$PATH:$GOROOT/bin`
+	3. Reload your bashrc
+		`source ~/.bashrc`
+4. Edit /etc/security/limits.conf and add the following lines (replace *username* with your user):
+
+	```
+		username	soft	nofile	8096  
+		username	hard	nofile	8096  
+	```
+
+	You will need to reboot after changing this. If you don't increase the file handle limit you may see some weird build issues with browserify or npm.
+5. Install Node.js
+	`pacman -S nodejs npm`
+6. Install Ruby and Compass
+	1. `pacman -S ruby`
+	2. Add executable gems to your path in your ~/.bashrc
+
+		`PATH="$(ruby -e 'print Gem.user_dir')/bin:$PATH"`
+	3. `gem install compass`
+7. Download Mattermost
+	`cd ~/go`  
+	`mkdir -p src/github.com/mattermost`  
+	`cd src/github.com/mattermost`  
+	`git clone https://github.com/mattermost/platform.git`  
+	`cd platform`  
+8. Run unit tests on Mattermost using `make test` to make sure the installation was successful
+9. If tests passed, you can now run Mattermost using `make run`
 
 Any issues? Please let us know on our forums at: http://forum.mattermost.org

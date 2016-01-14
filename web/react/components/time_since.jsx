@@ -1,7 +1,8 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var Utils = require('../utils/utils.jsx');
+import Constants from '../utils/constants.jsx';
+import * as Utils from '../utils/utils.jsx';
 
 var Tooltip = ReactBootstrap.Tooltip;
 var OverlayTrigger = ReactBootstrap.OverlayTrigger;
@@ -30,11 +31,11 @@ export default class TimeSince extends React.Component {
 
         return (
             <OverlayTrigger
-                delayShow={400}
+                delayShow={Constants.OVERLAY_TIME_DELAY}
                 placement='top'
                 overlay={tooltip}
             >
-                <time className='post-profile-time'>
+                <time className='post__time'>
                     {Utils.displayDateTime(this.props.eventTime)}
                 </time>
             </OverlayTrigger>

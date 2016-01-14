@@ -1,8 +1,12 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var Client = require('../../utils/client.jsx');
-var AsyncClient = require('../../utils/async_client.jsx');
+import * as Client from '../../utils/client.jsx';
+import * as AsyncClient from '../../utils/async_client.jsx';
+
+const DefaultSessionLength = 30;
+const DefaultMaximumLoginAttempts = 10;
+const DefaultSessionCacheInMinutes = 10;
 
 export default class ServiceSettings extends React.Component {
     constructor(props) {
@@ -36,20 +40,64 @@ export default class ServiceSettings extends React.Component {
         config.ServiceSettings.SegmentDeveloperKey = ReactDOM.findDOMNode(this.refs.SegmentDeveloperKey).value.trim();
         config.ServiceSettings.GoogleDeveloperKey = ReactDOM.findDOMNode(this.refs.GoogleDeveloperKey).value.trim();
         config.ServiceSettings.EnableIncomingWebhooks = ReactDOM.findDOMNode(this.refs.EnableIncomingWebhooks).checked;
-        config.ServiceSettings.EnableOutgoingWebhooks = React.findDOMNode(this.refs.EnableOutgoingWebhooks).checked;
+        config.ServiceSettings.EnableOutgoingWebhooks = ReactDOM.findDOMNode(this.refs.EnableOutgoingWebhooks).checked;
         config.ServiceSettings.EnablePostUsernameOverride = ReactDOM.findDOMNode(this.refs.EnablePostUsernameOverride).checked;
         config.ServiceSettings.EnablePostIconOverride = ReactDOM.findDOMNode(this.refs.EnablePostIconOverride).checked;
         config.ServiceSettings.EnableTesting = ReactDOM.findDOMNode(this.refs.EnableTesting).checked;
+        config.ServiceSettings.EnableDeveloper = ReactDOM.findDOMNode(this.refs.EnableDeveloper).checked;
         config.ServiceSettings.EnableSecurityFixAlert = ReactDOM.findDOMNode(this.refs.EnableSecurityFixAlert).checked;
 
         //config.ServiceSettings.EnableOAuthServiceProvider = ReactDOM.findDOMNode(this.refs.EnableOAuthServiceProvider).checked;
 
-        var MaximumLoginAttempts = 10;
+        var MaximumLoginAttempts = DefaultMaximumLoginAttempts;
         if (!isNaN(parseInt(ReactDOM.findDOMNode(this.refs.MaximumLoginAttempts).value, 10))) {
             MaximumLoginAttempts = parseInt(ReactDOM.findDOMNode(this.refs.MaximumLoginAttempts).value, 10);
         }
+        if (MaximumLoginAttempts < 1) {
+            MaximumLoginAttempts = 1;
+        }
         config.ServiceSettings.MaximumLoginAttempts = MaximumLoginAttempts;
         ReactDOM.findDOMNode(this.refs.MaximumLoginAttempts).value = MaximumLoginAttempts;
+
+        var SessionLengthWebInDays = DefaultSessionLength;
+        if (!isNaN(parseInt(ReactDOM.findDOMNode(this.refs.SessionLengthWebInDays).value, 10))) {
+            SessionLengthWebInDays = parseInt(ReactDOM.findDOMNode(this.refs.SessionLengthWebInDays).value, 10);
+        }
+        if (SessionLengthWebInDays < 1) {
+            SessionLengthWebInDays = 1;
+        }
+        config.ServiceSettings.SessionLengthWebInDays = SessionLengthWebInDays;
+        ReactDOM.findDOMNode(this.refs.SessionLengthWebInDays).value = SessionLengthWebInDays;
+
+        var SessionLengthMobileInDays = DefaultSessionLength;
+        if (!isNaN(parseInt(ReactDOM.findDOMNode(this.refs.SessionLengthMobileInDays).value, 10))) {
+            SessionLengthMobileInDays = parseInt(ReactDOM.findDOMNode(this.refs.SessionLengthMobileInDays).value, 10);
+        }
+        if (SessionLengthMobileInDays < 1) {
+            SessionLengthMobileInDays = 1;
+        }
+        config.ServiceSettings.SessionLengthMobileInDays = SessionLengthMobileInDays;
+        ReactDOM.findDOMNode(this.refs.SessionLengthMobileInDays).value = SessionLengthMobileInDays;
+
+        var SessionLengthSSOInDays = DefaultSessionLength;
+        if (!isNaN(parseInt(ReactDOM.findDOMNode(this.refs.SessionLengthSSOInDays).value, 10))) {
+            SessionLengthSSOInDays = parseInt(ReactDOM.findDOMNode(this.refs.SessionLengthSSOInDays).value, 10);
+        }
+        if (SessionLengthSSOInDays < 1) {
+            SessionLengthSSOInDays = 1;
+        }
+        config.ServiceSettings.SessionLengthSSOInDays = SessionLengthSSOInDays;
+        ReactDOM.findDOMNode(this.refs.SessionLengthSSOInDays).value = SessionLengthSSOInDays;
+
+        var SessionCacheInMinutes = DefaultSessionCacheInMinutes;
+        if (!isNaN(parseInt(ReactDOM.findDOMNode(this.refs.SessionCacheInMinutes).value, 10))) {
+            SessionCacheInMinutes = parseInt(ReactDOM.findDOMNode(this.refs.SessionCacheInMinutes).value, 10);
+        }
+        if (SessionCacheInMinutes < -1) {
+            SessionCacheInMinutes = -1;
+        }
+        config.ServiceSettings.SessionCacheInMinutes = SessionCacheInMinutes;
+        ReactDOM.findDOMNode(this.refs.SessionCacheInMinutes).value = SessionCacheInMinutes;
 
         Client.saveConfig(
             config,
@@ -171,7 +219,16 @@ export default class ServiceSettings extends React.Component {
                                 defaultValue={this.props.config.ServiceSettings.GoogleDeveloperKey}
                                 onChange={this.handleChange}
                             />
-                            <p className='help-text'>{'Set this key to enable embedding of YouTube video previews based on hyperlinks appearing in messages or comments. Instructions to obtain a key available at '}<a href='https://www.youtube.com/watch?v=Im69kzhpR3I'>{'https://www.youtube.com/watch?v=Im69kzhpR3I'}</a>{'. Leaving field blank disables the automatic generation of YouTube video previews from links.'}</p>
+                            <p className='help-text'>
+                                {'Set this key to enable embedding of YouTube video previews based on hyperlinks appearing in messages or comments. Instructions to obtain a key available at '}
+                                <a
+                                    href='https://www.youtube.com/watch?v=Im69kzhpR3I'
+                                    target='_blank'
+                                >
+                                    {'https://www.youtube.com/watch?v=Im69kzhpR3I'}
+                                </a>
+                                {'. Leaving the field blank disables the automatic generation of YouTube video previews from links.'}
+                            </p>
                         </div>
                     </div>
 
@@ -343,6 +400,39 @@ export default class ServiceSettings extends React.Component {
                     <div className='form-group'>
                         <label
                             className='control-label col-sm-4'
+                            htmlFor='EnableDeveloper'
+                        >
+                            {'Enable Developer Mode: '}
+                        </label>
+                        <div className='col-sm-8'>
+                            <label className='radio-inline'>
+                                <input
+                                    type='radio'
+                                    name='EnableDeveloper'
+                                    value='true'
+                                    ref='EnableDeveloper'
+                                    defaultChecked={this.props.config.ServiceSettings.EnableDeveloper}
+                                    onChange={this.handleChange}
+                                />
+                                    {'true'}
+                            </label>
+                            <label className='radio-inline'>
+                                <input
+                                    type='radio'
+                                    name='EnableDeveloper'
+                                    value='false'
+                                    defaultChecked={!this.props.config.ServiceSettings.EnableDeveloper}
+                                    onChange={this.handleChange}
+                                />
+                                    {'false'}
+                            </label>
+                            <p className='help-text'>{'(Developer Option) When true, extra information around errors will be displayed in the UI.'}</p>
+                        </div>
+                    </div>
+
+                    <div className='form-group'>
+                        <label
+                            className='control-label col-sm-4'
                             htmlFor='EnableSecurityFixAlert'
                         >
                             {'Enable Security Alerts: '}
@@ -370,6 +460,90 @@ export default class ServiceSettings extends React.Component {
                                     {'false'}
                             </label>
                             <p className='help-text'>{'When true, System Administrators are notified by email if a relevant security fix alert has been announced in the last 12 hours. Requires email to be enabled.'}</p>
+                        </div>
+                    </div>
+
+                    <div className='form-group'>
+                        <label
+                            className='control-label col-sm-4'
+                            htmlFor='SessionLengthWebInDays'
+                        >
+                            {'Session Length for Web in Days:'}
+                        </label>
+                        <div className='col-sm-8'>
+                            <input
+                                type='text'
+                                className='form-control'
+                                id='SessionLengthWebInDays'
+                                ref='SessionLengthWebInDays'
+                                placeholder='Ex "30"'
+                                defaultValue={this.props.config.ServiceSettings.SessionLengthWebInDays}
+                                onChange={this.handleChange}
+                            />
+                            <p className='help-text'>{'The web session will expire after the number of days specified and will require a user to login again.'}</p>
+                        </div>
+                    </div>
+
+                    <div className='form-group'>
+                        <label
+                            className='control-label col-sm-4'
+                            htmlFor='SessionLengthMobileInDays'
+                        >
+                            {'Session Length for Mobile Device in Days:'}
+                        </label>
+                        <div className='col-sm-8'>
+                            <input
+                                type='text'
+                                className='form-control'
+                                id='SessionLengthMobileInDays'
+                                ref='SessionLengthMobileInDays'
+                                placeholder='Ex "30"'
+                                defaultValue={this.props.config.ServiceSettings.SessionLengthMobileInDays}
+                                onChange={this.handleChange}
+                            />
+                            <p className='help-text'>{'The native mobile session will expire after the number of days specified and will require a user to login again.'}</p>
+                        </div>
+                    </div>
+
+                    <div className='form-group'>
+                        <label
+                            className='control-label col-sm-4'
+                            htmlFor='SessionLengthSSOInDays'
+                        >
+                            {'Session Length for SSO in Days:'}
+                        </label>
+                        <div className='col-sm-8'>
+                            <input
+                                type='text'
+                                className='form-control'
+                                id='SessionLengthSSOInDays'
+                                ref='SessionLengthSSOInDays'
+                                placeholder='Ex "30"'
+                                defaultValue={this.props.config.ServiceSettings.SessionLengthSSOInDays}
+                                onChange={this.handleChange}
+                            />
+                            <p className='help-text'>{'The SSO session will expire after the number of days specified and will require a user to login again.'}</p>
+                        </div>
+                    </div>
+
+                    <div className='form-group'>
+                        <label
+                            className='control-label col-sm-4'
+                            htmlFor='SessionCacheInMinutes'
+                        >
+                            {'Session Cache in Minutes:'}
+                        </label>
+                        <div className='col-sm-8'>
+                            <input
+                                type='text'
+                                className='form-control'
+                                id='SessionCacheInMinutes'
+                                ref='SessionCacheInMinutes'
+                                placeholder='Ex "30"'
+                                defaultValue={this.props.config.ServiceSettings.SessionCacheInMinutes}
+                                onChange={this.handleChange}
+                            />
+                            <p className='help-text'>{'The number of minutes to cache a session in memory.'}</p>
                         </div>
                     </div>
 

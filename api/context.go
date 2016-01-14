@@ -11,7 +11,7 @@ import (
 	"strconv"
 	"strings"
 
-	l4g "code.google.com/p/log4go"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/mattermost/platform/model"
 	"github.com/mattermost/platform/store"
 	"github.com/mattermost/platform/utils"
@@ -35,8 +35,11 @@ type Page struct {
 	TemplateName      string
 	Props             map[string]string
 	ClientCfg         map[string]string
+	ClientLicense     map[string]string
 	User              *model.User
 	Team              *model.Team
+	Channel           *model.Channel
+	PostID            string
 	SessionTokenIndex int64
 }
 
@@ -521,6 +524,13 @@ func GetSession(token string) *model.Session {
 			l4g.Error("Invalid session token=" + token + ", err=" + sessionResult.Err.DetailedError)
 		} else {
 			session = sessionResult.Data.(*model.Session)
+
+			if session.IsExpired() {
+				return nil
+			} else {
+				AddSessionToCache(session)
+				return session
+			}
 		}
 	}
 
@@ -551,5 +561,5 @@ func FindMultiSessionForTeamId(r *http.Request, teamId string) (int64, *model.Se
 }
 
 func AddSessionToCache(session *model.Session) {
-	sessionCache.Add(session.Token, session)
+	sessionCache.AddWithExpiresInSecs(session.Token, session, int64(*utils.Cfg.ServiceSettings.SessionCacheInMinutes*60))
 }

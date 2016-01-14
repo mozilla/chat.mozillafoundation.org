@@ -20,6 +20,7 @@ const (
 	DATABASE_DRIVER_POSTGRES = "postgres"
 
 	SERVICE_GITLAB = "gitlab"
+	SERVICE_GOOGLE = "google"
 )
 
 type ServiceSettings struct {
@@ -33,7 +34,12 @@ type ServiceSettings struct {
 	EnablePostUsernameOverride bool
 	EnablePostIconOverride     bool
 	EnableTesting              bool
+	EnableDeveloper            *bool
 	EnableSecurityFixAlert     *bool
+	SessionLengthWebInDays     *int
+	SessionLengthMobileInDays  *int
+	SessionLengthSSOInDays     *int
+	SessionCacheInMinutes      *int
 }
 
 type SSOSettings struct {
@@ -66,21 +72,25 @@ type LogSettings struct {
 }
 
 type FileSettings struct {
-	DriverName              string
-	Directory               string
-	EnablePublicLink        bool
-	PublicLinkSalt          string
-	ThumbnailWidth          int
-	ThumbnailHeight         int
-	PreviewWidth            int
-	PreviewHeight           int
-	ProfileWidth            int
-	ProfileHeight           int
-	InitialFont             string
-	AmazonS3AccessKeyId     string
-	AmazonS3SecretAccessKey string
-	AmazonS3Bucket          string
-	AmazonS3Region          string
+	DriverName                 string
+	Directory                  string
+	EnablePublicLink           bool
+	PublicLinkSalt             string
+	ThumbnailWidth             int
+	ThumbnailHeight            int
+	PreviewWidth               int
+	PreviewHeight              int
+	ProfileWidth               int
+	ProfileHeight              int
+	InitialFont                string
+	AmazonS3AccessKeyId        string
+	AmazonS3SecretAccessKey    string
+	AmazonS3Bucket             string
+	AmazonS3Region             string
+	AmazonS3Endpoint           string
+	AmazonS3BucketEndpoint     string
+	AmazonS3LocationConstraint *bool
+	AmazonS3LowercaseBucket    *bool
 }
 
 type EmailSettings struct {
@@ -96,11 +106,8 @@ type EmailSettings struct {
 	ConnectionSecurity       string
 	InviteSalt               string
 	PasswordResetSalt        string
-
-	// For Future Use
-	ApplePushServer      string
-	ApplePushCertPublic  string
-	ApplePushCertPrivate string
+	SendPushNotifications    *bool
+	PushNotificationServer   *string
 }
 
 type RateLimitSettings struct {
@@ -116,6 +123,15 @@ type PrivacySettings struct {
 	ShowFullName     bool
 }
 
+type SupportSettings struct {
+	TermsOfServiceLink *string
+	PrivacyPolicyLink  *string
+	AboutLink          *string
+	HelpLink           *string
+	ReportAProblemLink *string
+	SupportEmail       *string
+}
+
 type TeamSettings struct {
 	SiteName                  string
 	MaxUsersPerTeam           int
@@ -124,6 +140,26 @@ type TeamSettings struct {
 	RestrictCreationToDomains string
 	RestrictTeamNames         *bool
 	EnableTeamListing         *bool
+}
+
+type LdapSettings struct {
+	// Basic
+	Enable       *bool
+	LdapServer   *string
+	LdapPort     *int
+	BaseDN       *string
+	BindUsername *string
+	BindPassword *string
+
+	// User Mapping
+	FirstNameAttribute *string
+	LastNameAttribute  *string
+	EmailAttribute     *string
+	UsernameAttribute  *string
+	IdAttribute        *string
+
+	// Advansed
+	QueryTimeout *int
 }
 
 type Config struct {
@@ -135,7 +171,10 @@ type Config struct {
 	EmailSettings     EmailSettings
 	RateLimitSettings RateLimitSettings
 	PrivacySettings   PrivacySettings
+	SupportSettings   SupportSettings
 	GitLabSettings    SSOSettings
+	GoogleSettings    SSOSettings
+	LdapSettings      LdapSettings
 }
 
 func (o *Config) ToJson() string {
@@ -148,8 +187,11 @@ func (o *Config) ToJson() string {
 }
 
 func (o *Config) GetSSOService(service string) *SSOSettings {
-	if service == SERVICE_GITLAB {
+	switch service {
+	case SERVICE_GITLAB:
 		return &o.GitLabSettings
+	case SERVICE_GOOGLE:
+		return &o.GoogleSettings
 	}
 
 	return nil
@@ -167,6 +209,38 @@ func ConfigFromJson(data io.Reader) *Config {
 }
 
 func (o *Config) SetDefaults() {
+
+	if len(o.SqlSettings.AtRestEncryptKey) == 0 {
+		o.SqlSettings.AtRestEncryptKey = NewRandomString(32)
+	}
+
+	if len(o.FileSettings.PublicLinkSalt) == 0 {
+		o.FileSettings.PublicLinkSalt = NewRandomString(32)
+	}
+
+	if o.FileSettings.AmazonS3LocationConstraint == nil {
+		o.FileSettings.AmazonS3LocationConstraint = new(bool)
+		*o.FileSettings.AmazonS3LocationConstraint = false
+	}
+
+	if o.FileSettings.AmazonS3LowercaseBucket == nil {
+		o.FileSettings.AmazonS3LowercaseBucket = new(bool)
+		*o.FileSettings.AmazonS3LowercaseBucket = false
+	}
+
+	if len(o.EmailSettings.InviteSalt) == 0 {
+		o.EmailSettings.InviteSalt = NewRandomString(32)
+	}
+
+	if len(o.EmailSettings.PasswordResetSalt) == 0 {
+		o.EmailSettings.PasswordResetSalt = NewRandomString(32)
+	}
+
+	if o.ServiceSettings.EnableDeveloper == nil {
+		o.ServiceSettings.EnableDeveloper = new(bool)
+		*o.ServiceSettings.EnableDeveloper = false
+	}
+
 	if o.ServiceSettings.EnableSecurityFixAlert == nil {
 		o.ServiceSettings.EnableSecurityFixAlert = new(bool)
 		*o.ServiceSettings.EnableSecurityFixAlert = true
@@ -180,6 +254,81 @@ func (o *Config) SetDefaults() {
 	if o.TeamSettings.EnableTeamListing == nil {
 		o.TeamSettings.EnableTeamListing = new(bool)
 		*o.TeamSettings.EnableTeamListing = false
+	}
+
+	if o.EmailSettings.SendPushNotifications == nil {
+		o.EmailSettings.SendPushNotifications = new(bool)
+		*o.EmailSettings.SendPushNotifications = false
+	}
+
+	if o.EmailSettings.PushNotificationServer == nil {
+		o.EmailSettings.PushNotificationServer = new(string)
+		*o.EmailSettings.PushNotificationServer = ""
+	}
+
+	if o.SupportSettings.TermsOfServiceLink == nil {
+		o.SupportSettings.TermsOfServiceLink = new(string)
+		*o.SupportSettings.TermsOfServiceLink = "/static/help/terms.html"
+	}
+
+	if o.SupportSettings.PrivacyPolicyLink == nil {
+		o.SupportSettings.PrivacyPolicyLink = new(string)
+		*o.SupportSettings.PrivacyPolicyLink = "/static/help/privacy.html"
+	}
+
+	if o.SupportSettings.AboutLink == nil {
+		o.SupportSettings.AboutLink = new(string)
+		*o.SupportSettings.AboutLink = "/static/help/about.html"
+	}
+
+	if o.SupportSettings.HelpLink == nil {
+		o.SupportSettings.HelpLink = new(string)
+		*o.SupportSettings.HelpLink = "/static/help/help.html"
+	}
+
+	if o.SupportSettings.ReportAProblemLink == nil {
+		o.SupportSettings.ReportAProblemLink = new(string)
+		*o.SupportSettings.ReportAProblemLink = "/static/help/report_problem.html"
+	}
+
+	if o.SupportSettings.SupportEmail == nil {
+		o.SupportSettings.SupportEmail = new(string)
+		*o.SupportSettings.SupportEmail = "feedback@mattermost.com"
+	}
+
+	if o.LdapSettings.LdapPort == nil {
+		o.LdapSettings.LdapPort = new(int)
+		*o.LdapSettings.LdapPort = 389
+	}
+
+	if o.LdapSettings.QueryTimeout == nil {
+		o.LdapSettings.QueryTimeout = new(int)
+		*o.LdapSettings.QueryTimeout = 60
+	}
+
+	if o.LdapSettings.Enable == nil {
+		o.LdapSettings.Enable = new(bool)
+		*o.LdapSettings.Enable = false
+	}
+
+	if o.ServiceSettings.SessionLengthWebInDays == nil {
+		o.ServiceSettings.SessionLengthWebInDays = new(int)
+		*o.ServiceSettings.SessionLengthWebInDays = 30
+	}
+
+	if o.ServiceSettings.SessionLengthMobileInDays == nil {
+		o.ServiceSettings.SessionLengthMobileInDays = new(int)
+		*o.ServiceSettings.SessionLengthMobileInDays = 30
+	}
+
+	if o.ServiceSettings.SessionLengthSSOInDays == nil {
+		o.ServiceSettings.SessionLengthSSOInDays = new(int)
+		*o.ServiceSettings.SessionLengthSSOInDays = 30
+	}
+
+	if o.ServiceSettings.SessionCacheInMinutes == nil {
+		o.ServiceSettings.SessionCacheInMinutes = new(int)
+		*o.ServiceSettings.SessionCacheInMinutes = 10
 	}
 }
 
@@ -270,4 +419,12 @@ func (o *Config) IsValid() *AppError {
 	}
 
 	return nil
+}
+
+func (me *Config) GetSanitizeOptions() map[string]bool {
+	options := map[string]bool{}
+	options["fullname"] = me.PrivacySettings.ShowFullName
+	options["email"] = me.PrivacySettings.ShowEmailAddress
+
+	return options
 }

@@ -1,8 +1,8 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var Utils = require('../utils/utils.jsx');
-var UserStore = require('../stores/user_store.jsx');
+import * as Utils from '../utils/utils.jsx';
+import UserStore from '../stores/user_store.jsx';
 var Popover = ReactBootstrap.Popover;
 var OverlayTrigger = ReactBootstrap.OverlayTrigger;
 
@@ -54,20 +54,27 @@ export default class UserProfile extends React.Component {
         }
     }
     render() {
-        var name = this.state.profile.username;
+        var name = Utils.displayUsername(this.state.profile.id);
         if (this.props.overwriteName) {
             name = this.props.overwriteName;
+        } else if (!name) {
+            name = '...';
         }
 
         if (this.props.disablePopover) {
             return <div>{name}</div>;
         }
 
+        var profileImg = '/api/v1/users/' + this.state.profile.id + '/image?time=' + this.state.profile.update_at + '&' + Utils.getSessionIndex();
+        if (this.props.overwriteImage) {
+            profileImg = this.props.overwriteImage;
+        }
+
         var dataContent = [];
         dataContent.push(
             <img
                 className='user-popover__image'
-                src={'/api/v1/users/' + this.state.profile.id + '/image?time=' + this.state.profile.update_at + '&' + Utils.getSessionIndex()}
+                src={profileImg}
                 height='128'
                 width='128'
                 key='user-popover-image'
@@ -107,7 +114,7 @@ export default class UserProfile extends React.Component {
                 rootClose={true}
                 overlay={
                     <Popover
-                        title={this.state.profile.username}
+                        title={name}
                         id='user-profile-popover'
                     >
                         {dataContent}
@@ -128,10 +135,12 @@ export default class UserProfile extends React.Component {
 UserProfile.defaultProps = {
     userId: '',
     overwriteName: '',
+    overwriteImage: '',
     disablePopover: false
 };
 UserProfile.propTypes = {
     userId: React.PropTypes.string,
     overwriteName: React.PropTypes.string,
+    overwriteImage: React.PropTypes.string,
     disablePopover: React.PropTypes.bool
 };

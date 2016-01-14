@@ -1,3 +1,5 @@
+@charset "UTF-8";
+
 @media screen and (max-width: 1800px) {
     .inner__wrap {
         &.move--left {
@@ -8,200 +10,15 @@
                     }
                 }
             }
-            .post {
-                &.post--comment {
-		            &.same--root {
-		                margin-left: 104px;
-		                padding-left: 10px;
-		                border-left: 4px solid #EEE;
-		                div.post-profile-img__container {
-		                    .post-profile-img {
-		                        display: none;
-		                    }
-		                }
-		                .post__content {
-		                    width: 825px;
-		                    margin-left: 0;
-		                }
-		                .post-body {
-		                    width: 736px;
-		                    border: none;
-		                    margin: 3px 0 0;
-		                }
-		            }
-                    &.other--root {
-                        .post-comment {
-                            margin-left: 0;
-                        }
-                    }
-                    &.same--root {
-                        margin-top: 10px;
-                        margin-bottom: 10px;
-                    }
-                }
-                .post-body {
-                    float: none;
-                    width: 750px;
-                    margin: 3px 0 0;
-                }
-                .post__content {
-                    width: 920px;
-                }
-                .post-header {
-                    &.post-header-post {
-                        z-index: inherit;
-                        width: auto;
-                        float: none;
-                        text-align: left;
-                        padding-right: 0;
-                    }
-                    &.post-info {
-                        display: none;
-                        float: none;
-                    }
-                    .post-header-col {
-                        &.post-header__reply {
-                            float: right;
-                            text-align: right;
-                            .reply-link {
-                                margin-right: 0;
-                            }
-                            .dropdown {
-                                margin-left: 10px;
-                            }
-                        }
-                    }
-                    .post-info--hidden {
-                        display: inline;
-                        .post-info {
-                            display: inline;
-                            .tooltip {
-                                margin-top: -25px;
-                                margin-left: 40px;
-                            }
-                            .post-profile-time {
-                                margin: 0;
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
 }
 @media screen and (max-width: 1440px) {
-    .post-create__container {
-        .post-create-body {
-            max-width: 810px;
-        }
-    }
-    .channel-intro {
-        max-width: 810px;
-    }
     .date-separator, .new-separator {
         &.hovered--comment {
             &:before, &:after {
                 background: none !important;
             }
-        }
-    }
-    .post {
-		&.same--root.same--user {
-			.post-header-post {
-				visibility: hidden;
-				width: 100%;
-				position: relative;
-				top: -5px;
-				.post-header-col.post-header__name {
-					display: none;
-				}
-			}
-			.post-body {
-				top: -15px;
-				margin-bottom: -10px;
-			}
-			&:hover .post-header-post {
-				visibility: visible;
-			}
-		}
-
-        &.post--comment {
-            &.other--root {
-                .post-comment {
-                    margin-left: 0;
-                }
-            }
-			&.same--root {
-				margin-top: 5px;
-				margin-bottom: 5px;
-				margin-left: 104px;
-				padding-left: 10px;
-				border-left: 4px solid #EEE;
-				div.post-profile-img__container {
-					.post-profile-img {
-						display: none;
-					}
-				}
-				.post-body {
-					margin-left: 0;
-					border-left: 0;
-				}
-				&.same--user {
-					.post__content {
-						margin-left: 0;
-						padding-left: 0;
-					}
-				}
-			}
-			.post__content {
-				width: 810px;
-			}
-			.post-body {
-				width: 736px;
-				border: none;
-				margin: 3px 0 0;
-			}
-        }
-        .post__content {
-            width: 880px;
-        }
-        .post-header {
-            &.post-header-post {
-                z-index: inherit;
-                width: auto;
-                float: none;
-                text-align: left;
-                padding-right: 0;
-            }
-            &.post-info {
-                display: none;
-                float: none;
-            }
-            .post-header-col {
-                &.post-header__reply {
-                    float: right;
-                    margin: 0;
-                }
-            }
-            .post-info--hidden {
-                display: inline;
-                .post-info {
-                    display: inline;
-                    .tooltip {
-                        margin-top: -25px;
-                        margin-left: 40px;
-                    }
-                    .post-profile-time {
-                        width: auto;
-                        margin: 0;
-                    }
-                }
-            }
-        }
-        .post-body {
-            margin: 3px 0 0;
-            float: none;
-            width: 750px;
         }
     }
 }
@@ -232,79 +49,119 @@
             }
         }
     }
-    .post {
-        .post__content {
-            width: 100%;
-        }
-        .post-header {
-            .post-header-col {
-                &.post-header__reply {
-                    .reply-link {
-                        margin-right: 0;
-                    }
-                    .dropdown {
-                        margin-left: 10px;
-                    }
-                }
-            }
-        }
-    }
 }
 
 @media screen and (max-width: 960px) {
-    .post {
-        .post-header .post-header-col.post-header__reply {
-            .comment-icon__container__hide {
-                display: none;
-            }
-            .dropdown {
-                @include opacity(1);
-            }
-            .comment-icon__container__show {
-                @include opacity(1);
-            }
+
+    .sidebar--right {
+        z-index: 5;
+        @include translateX(100%);
+        @include single-transition(all, 0.5s, ease);
+
+        &.move--left {
+            @include translateX(0);
         }
+
     }
+
+    .inner__wrap {
+
+        &.move--left {
+            margin-right: 0;
+        }
+
+    }
+
+    .post {
+
+        .post-list__content & {
+
+            &:hover {
+                background: transparent;
+
+                .comment-icon__container {
+                    visibility: hidden;
+
+                    &.icon--show {
+                        visibility: visible;
+                    }
+
+                }
+
+            }
+
+        }
+
+        .dropdown {
+            visibility: visible;
+        }
+
+        .post__dropdown {
+            line-height: 9px;
+            text-decoration: none;
+            width: 20px;
+            display: inline-block;
+            text-align: center;
+            height: 20px;
+
+            &:after {
+                font-size: 20px;
+                content: '...';
+                top: -3px;
+            }
+
+        }
+
+    }
+
+}
+
+@media screen and (max-width: 768px) {
+
     .signup-team__container {
         font-size: 1em;
     }
+
     .post {
-        .post-header {
-            .post-header-col {
-                &.post-header__reply {
-                    text-align: right;
-                    display: inline-block;
+
+        .post__header {
+
+            .col__name {
+                pointer-events: none;
+            }
+
+        }
+
+        &.same--root {
+
+            &.same--user {
+
+                .post__time {
+                    display: none;
                 }
+
+            }
+
+        }
+
+        .post__img {
+            width: 40px;
+
+            img {
+                width: 32px;
+                height: 32px;
             }
         }
-    }
-}
 
-@media (min-width: 992px){
-    .modal-lg {
-        width: 700px;
     }
-}
 
-@media screen and (min-width: 768px) {
-    .second-bar {
-        display: none;
+    .post-image__column {
+        width: 200px;
+        height: 95px;
     }
-}
 
-@media screen and (max-height: 640px) {
-    .signup-team__container {
-        padding: 30px 0;
-        margin-bottom: 30px;
-        font-size: 0.9em;
-        .signup-team__name {
-            font-size: 2em;
-        }
-    }
-}
-@media screen and (max-width: 768px) {
     .textarea-wrapper {
-        .textbox-preview-link {
+        .textbox-preview-link, .textbox-help-link {
             display: none;
         }
     }
@@ -385,34 +242,8 @@
             }
         }
     }
-    .post {
-        &:hover {
-            background: none;
-            .post-header .post-header-col.post-header__reply {
-                .dropdown-toggle:after {
-                    content: '...';
-                }
-            }
-        }
-        &.post--comment {
-            &.same--root {
-                margin-left: 25px;
-            }
-            &.other--root {
-               margin-left: 0;
-                &:hover {
-                    background: none;
-                }
-            }
-        }
-        .post-header .post-header-col.post-header__reply {
-            .dropdown-toggle:after {
-                content: '...';
-            }
-        }
-		&.same--root.same--user .post__content{
-			padding-left: 0;
-		}
+    .post-list__timestamp {
+        display: block;
     }
     .signup-team__container {
         padding: 30px 0;
@@ -468,15 +299,9 @@
                 .settings-content {
                     &.minimize-settings {
                         display: block;
-                        .section-edit {
-                            position: absolute;
-                            top: 7px;
-                            right: 0;
-                            width: 50px;
-                            .fa {
-                                display: inline-block;
-                            }
-                        }
+                    }
+                    .section-min:hover {
+                        background: none;
                     }
                     .no-padding--left {
                         padding-left: 15px;
@@ -487,7 +312,8 @@
                 }
                 .modal-header {
                     display: block;
-                    position: fixed;
+                    position: absolute;
+                    top: 0;
                     width: 100%;
                     z-index: 5;
                 }
@@ -505,18 +331,33 @@
             }
         }
         .settings-table {
-            .nav, .nav.absolute {
+            .nav {
+                &.position--top {
+                    top: auto;
+                }
                 position: relative;
                 top: auto;
                 width: 100%;
             }
             .settings-content {
+                .section-edit {
+                    position: absolute;
+                    top: 14px;
+                    right: 0;
+                    padding-right: 0;
+                    .fa {
+                        display: inline-block;
+                    }
+                }
                 &.minimize-settings {
                     padding: 0;
                     display: none;
                     .user-settings {
                         padding: 70px 20px 30px;
                     }
+                }
+                .section-min:hover {
+                    background: none !important;
                 }
             }
             .settings-links {
@@ -552,10 +393,8 @@
             .msg-typing {
                 display: none;
             }
-            .has-error {
-                .control-label {
-                    height: auto;
-                }
+            .control-label {
+                top: 0;
             }
         }
         .post-create-body {
@@ -584,8 +423,7 @@
         }
     }
     .preview-container {
-        padding: 0px;
-        margin-top: 5px;
+        margin: 5px 0 0;
         .preview-div {
             margin-top: 0;
         }
@@ -613,6 +451,7 @@
     #navbar {
         .navbar-default {
             .navbar-header {
+                float: none;
                 margin: 0 -15px;
                 .dropdown__icon {
                     background: url("../images/dropdown-icon.png");
@@ -692,7 +531,8 @@
                 padding: 0 10px 0 31px;
                 background: rgba(black, 0.2);
                 @include border-radius(3px);
-                color: inherit;
+                color: #444;
+                background: #fff;
             }
         }
     }
@@ -717,14 +557,14 @@
         &.move--right {
             @include translate3d(0, 0, 0);
         }
+        > div {
+            padding-bottom: 0;
+        }
         .nav-pills__unread-indicator-bottom {
             bottom: 10px;
         }
         .badge {
             top: 13px;
-        }
-        > div {
-            padding-bottom: 65px;
         }
         .team__header {
             display: none;
@@ -795,6 +635,7 @@
         height: calc(100% - 44px);
     }
     .inner__wrap {
+        @include single-transition(all, 0.5s, ease);
         &.move--right {
             @include translate3d(290px, 0, 0);
             &:before {
@@ -829,8 +670,10 @@
     .modal {
         .modal-image {
             .image-wrapper {
-                font-size: 12px;
-                min-width: 250px;
+                > div {
+                    font-size: 12px;
+                    min-width: 250px;
+                }
                 .modal-close {
                     @include opacity(1);
                 }
@@ -856,24 +699,6 @@
         .row {
             &.header {
                 display: block;
-            }
-        }
-    }
-
-    .post {
-        .post-profile-img__container {
-            display: none;
-        }
-        &.post--comment {
-            &.other--root {
-                .post-comment {
-                    margin-left: 11px;
-                }
-            }
-        }
-        > div {
-            &.post__content {
-                padding: 0;
             }
         }
     }
@@ -914,6 +739,9 @@
     }
 }
 @media screen and (max-width: 480px) {
+    .tip-overlay.tip-overlay--sidebar {
+        min-height: 350px;
+    }
     .modal {
         .modal-body {
             max-height: 70%;
@@ -955,6 +783,30 @@
                 line-height: 30px;
                 padding: 5px;
             }
+        }
+    }
+}
+
+
+@media (min-width: 992px){
+    .modal-lg {
+        width: 700px;
+    }
+}
+
+@media screen and (min-width: 768px) {
+    .second-bar {
+        display: none;
+    }
+}
+
+@media screen and (max-height: 640px) {
+    .signup-team__container {
+        padding: 30px 0;
+        margin-bottom: 30px;
+        font-size: 0.9em;
+        .signup-team__name {
+            font-size: 2em;
         }
     }
 }

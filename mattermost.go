@@ -17,12 +17,18 @@ import (
 	"syscall"
 	"time"
 
-	l4g "code.google.com/p/log4go"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/mattermost/platform/api"
 	"github.com/mattermost/platform/manualtesting"
 	"github.com/mattermost/platform/model"
 	"github.com/mattermost/platform/utils"
 	"github.com/mattermost/platform/web"
+
+	// Plugins
+	_ "github.com/mattermost/platform/model/gitlab"
+
+	// Enterprise Deps
+	_ "github.com/go-ldap/ldap"
 )
 
 var flagCmdCreateTeam bool
@@ -30,6 +36,8 @@ var flagCmdCreateUser bool
 var flagCmdAssignRole bool
 var flagCmdVersion bool
 var flagCmdResetPassword bool
+var flagCmdPermanentDeleteUser bool
+var flagCmdPermanentDeleteTeam bool
 var flagConfigFile string
 var flagEmail string
 var flagPassword string
@@ -49,12 +57,15 @@ func main() {
 
 	pwd, _ := os.Getwd()
 	l4g.Info("Current version is %v (%v/%v/%v)", model.CurrentVersion, model.BuildNumber, model.BuildDate, model.BuildHash)
+	l4g.Info("Enterprise Enabled: %t", model.BuildEnterpriseReady)
 	l4g.Info("Current working directory is %v", pwd)
 	l4g.Info("Loaded config file from %v", utils.FindConfigFile(flagConfigFile))
 
 	api.NewServer()
 	api.InitApi()
 	web.InitWeb()
+
+	utils.LoadLicense()
 
 	if flagRunCmds {
 		runCmds()
@@ -66,6 +77,7 @@ func main() {
 			manualtesting.InitManualTesting()
 		}
 
+		setDiagnosticId()
 		runSecurityAndDiagnosticsJobAndForget()
 
 		// wait for kill signal before attempting to gracefully shutdown
@@ -75,6 +87,21 @@ func main() {
 		<-c
 
 		api.StopServer()
+	}
+}
+
+func setDiagnosticId() {
+	if result := <-api.Srv.Store.System().Get(); result.Err == nil {
+		props := result.Data.(model.StringMap)
+
+		id := props[model.SYSTEM_DIAGNOSTIC_ID]
+		if len(id) == 0 {
+			id = model.NewId()
+			systemId := &model.System{Name: model.SYSTEM_DIAGNOSTIC_ID, Value: id}
+			<-api.Srv.Store.System().Save(systemId)
+		}
+
+		utils.CfgDiagnosticId = id
 	}
 }
 
@@ -90,16 +117,11 @@ func runSecurityAndDiagnosticsJobAndForget() {
 					if (currentTime - lastSecurityTime) > 1000*60*60*24*1 {
 						l4g.Debug("Checking for security update from Mattermost")
 
-						id := props[model.SYSTEM_DIAGNOSTIC_ID]
-						if len(id) == 0 {
-							id = model.NewId()
-							systemId := &model.System{Name: model.SYSTEM_DIAGNOSTIC_ID, Value: id}
-							<-api.Srv.Store.System().Save(systemId)
-						}
-
 						v := url.Values{}
-						v.Set(utils.PROP_DIAGNOSTIC_ID, id)
+
+						v.Set(utils.PROP_DIAGNOSTIC_ID, utils.CfgDiagnosticId)
 						v.Set(utils.PROP_DIAGNOSTIC_BUILD, model.CurrentVersion+"."+model.BuildNumber)
+						v.Set(utils.PROP_DIAGNOSTIC_ENTERPRISE_READY, model.BuildEnterpriseReady)
 						v.Set(utils.PROP_DIAGNOSTIC_DATABASE, utils.Cfg.SqlSettings.DriverName)
 						v.Set(utils.PROP_DIAGNOSTIC_OS, runtime.GOOS)
 						v.Set(utils.PROP_DIAGNOSTIC_CATEGORY, utils.VAL_DIAGNOSTIC_CATEGORY_DEFAULT)
@@ -191,10 +213,18 @@ func parseCmds() {
 	flag.BoolVar(&flagCmdAssignRole, "assign_role", false, "")
 	flag.BoolVar(&flagCmdVersion, "version", false, "")
 	flag.BoolVar(&flagCmdResetPassword, "reset_password", false, "")
+	flag.BoolVar(&flagCmdPermanentDeleteUser, "permanent_delete_user", false, "")
+	flag.BoolVar(&flagCmdPermanentDeleteTeam, "permanent_delete_team", false, "")
 
 	flag.Parse()
 
-	flagRunCmds = flagCmdCreateTeam || flagCmdCreateUser || flagCmdAssignRole || flagCmdResetPassword || flagCmdVersion
+	flagRunCmds = (flagCmdCreateTeam ||
+		flagCmdCreateUser ||
+		flagCmdAssignRole ||
+		flagCmdResetPassword ||
+		flagCmdVersion ||
+		flagCmdPermanentDeleteUser ||
+		flagCmdPermanentDeleteTeam)
 }
 
 func runCmds() {
@@ -203,6 +233,8 @@ func runCmds() {
 	cmdCreateUser()
 	cmdAssignRole()
 	cmdResetPassword()
+	cmdPermDeleteUser()
+	cmdPermDeleteTeam()
 }
 
 func cmdCreateTeam() {
@@ -261,10 +293,6 @@ func cmdCreateUser() {
 			os.Exit(1)
 		}
 
-		c := &api.Context{}
-		c.RequestId = model.NewId()
-		c.IpAddress = "cmd_line"
-
 		var team *model.Team
 		user := &model.User{}
 		user.Email = flagEmail
@@ -280,10 +308,10 @@ func cmdCreateUser() {
 			user.TeamId = team.Id
 		}
 
-		api.CreateUser(c, team, user)
-		if c.Err != nil {
-			if c.Err.Message != "An account with that email already exists." {
-				l4g.Error("%v", c.Err)
+		_, err := api.CreateUser(team, user)
+		if err != nil {
+			if err.Message != "An account with that email already exists." {
+				l4g.Error("%v", err)
 				flushLogAndExit(1)
 			}
 		}
@@ -298,6 +326,7 @@ func cmdVersion() {
 		fmt.Fprintln(os.Stderr, "Build Number: "+model.BuildNumber)
 		fmt.Fprintln(os.Stderr, "Build Date: "+model.BuildDate)
 		fmt.Fprintln(os.Stderr, "Build Hash: "+model.BuildHash)
+		fmt.Fprintln(os.Stderr, "Build Enterprise Ready: "+model.BuildEnterpriseReady)
 
 		os.Exit(0)
 	}
@@ -406,6 +435,106 @@ func cmdResetPassword() {
 	}
 }
 
+func cmdPermDeleteUser() {
+	if flagCmdPermanentDeleteUser {
+		if len(flagTeamName) == 0 {
+			fmt.Fprintln(os.Stderr, "flag needs an argument: -team_name")
+			flag.Usage()
+			os.Exit(1)
+		}
+
+		if len(flagEmail) == 0 {
+			fmt.Fprintln(os.Stderr, "flag needs an argument: -email")
+			flag.Usage()
+			os.Exit(1)
+		}
+
+		c := &api.Context{}
+		c.RequestId = model.NewId()
+		c.IpAddress = "cmd_line"
+
+		var team *model.Team
+		if result := <-api.Srv.Store.Team().GetByName(flagTeamName); result.Err != nil {
+			l4g.Error("%v", result.Err)
+			flushLogAndExit(1)
+		} else {
+			team = result.Data.(*model.Team)
+		}
+
+		var user *model.User
+		if result := <-api.Srv.Store.User().GetByEmail(team.Id, flagEmail); result.Err != nil {
+			l4g.Error("%v", result.Err)
+			flushLogAndExit(1)
+		} else {
+			user = result.Data.(*model.User)
+		}
+
+		var confirmBackup string
+		fmt.Print("Have you performed a database backup? (YES/NO): ")
+		fmt.Scanln(&confirmBackup)
+		if confirmBackup != "YES" {
+			flushLogAndExit(1)
+		}
+
+		var confirm string
+		fmt.Printf("Are you sure you want to delete the user %v?  All data will be permanently deleted? (YES/NO): ", user.Email)
+		fmt.Scanln(&confirm)
+		if confirm != "YES" {
+			flushLogAndExit(1)
+		}
+
+		if err := api.PermanentDeleteUser(c, user); err != nil {
+			l4g.Error("%v", err)
+			flushLogAndExit(1)
+		} else {
+			flushLogAndExit(0)
+		}
+	}
+}
+
+func cmdPermDeleteTeam() {
+	if flagCmdPermanentDeleteTeam {
+		if len(flagTeamName) == 0 {
+			fmt.Fprintln(os.Stderr, "flag needs an argument: -team_name")
+			flag.Usage()
+			os.Exit(1)
+		}
+
+		c := &api.Context{}
+		c.RequestId = model.NewId()
+		c.IpAddress = "cmd_line"
+
+		var team *model.Team
+		if result := <-api.Srv.Store.Team().GetByName(flagTeamName); result.Err != nil {
+			l4g.Error("%v", result.Err)
+			flushLogAndExit(1)
+		} else {
+			team = result.Data.(*model.Team)
+		}
+
+		var confirmBackup string
+		fmt.Print("Have you performed a database backup? (YES/NO): ")
+		fmt.Scanln(&confirmBackup)
+		if confirmBackup != "YES" {
+			flushLogAndExit(1)
+		}
+
+		var confirm string
+		fmt.Printf("Are you sure you want to delete the team %v?  All data will be permanently deleted? (YES/NO): ", team.Name)
+		fmt.Scanln(&confirm)
+		if confirm != "YES" {
+			flushLogAndExit(1)
+		}
+
+		if err := api.PermanentDeleteTeam(c, team); err != nil {
+			l4g.Error("%v", err)
+			flushLogAndExit(1)
+		} else {
+			flushLogAndExit(0)
+		}
+	}
+}
+
 func flushLogAndExit(code int) {
 	l4g.Close()
 	time.Sleep(time.Second)
@@ -413,12 +542,14 @@ func flushLogAndExit(code int) {
 }
 
 var usage = `Mattermost commands to help configure the system
-Usage:
 
+NAME: 
+    platform -- platform configuation tool
+    
+USAGE: 
     platform [options]
-
-    -version                          Display the current version
-
+    
+FLAGS: 
     -config="config.json"             Path to the config file
 
     -email="user@example.com"         Email address used in other commands
@@ -435,10 +566,8 @@ Usage:
                                            is used to help administer one team.
                                         "system_admin" - Represents a system
                                            admin who has access to all teams
-                                           and configuration settings.  This
-                                           role can only be created on the
-                                           team named "admin"
-
+                                           and configuration settings.
+COMMANDS: 
     -create_team                      Creates a team.  It requires the -team_name
                                       and -email flag to create a team.
         Example:
@@ -450,7 +579,7 @@ Usage:
             platform -create_user -team_name="name" -email="user@example.com" -password="mypassword"
 
     -assign_role                      Assigns role to a user.  It requires the -role,
-                                      -email and -team_name flag.  You may need to logout
+                                      -email and -team_name flag.  You may need to log out
                                       of your current sessions for the new role to be
                                       applied.
         Example:
@@ -461,5 +590,20 @@ Usage:
         Example:
             platform -reset_password -team_name="name" -email="user@example.com" -password="newpassword"
 
+    -permanent_delete_user            Permanently deletes a user and all related information
+                                      including posts from the database.  It requires the 
+                                      -team_name, and -email flag.  You may need to restart the
+                                      server to invalidate the cache
+        Example:
+            platform -permanent_delete_user -team_name="name" -email="user@example.com"
 
-`
+    -permanent_delete_team            Permanently deletes a team and all users along with
+                                      all related information including posts from the database.
+                                      It requires the -team_name flag.  You may need to restart
+                                      the server to invalidate the cache.
+        Example:
+            platform -permanent_delete_team -team_name="name"
+
+    -version                          Display the current of the Mattermost platform 
+
+    -help                             Displays this help page`

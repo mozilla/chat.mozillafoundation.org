@@ -1,15 +1,19 @@
+@charset "UTF-8";
+
 .sidebar--right {
-    position: absolute;
+    position: fixed;
     width: 400px;
     height: 100%;
     right: 0px;
     padding: 0;
     background: #fff;
-    @include single-transition(transform, 0.5s, ease);
-    right: -320px;
+    @include translateX(400px);
+    .post-body {
 
-    &.move--left {
-        right: 0;
+        img {
+            max-height: 200px;
+        }
+
     }
 
     .sidebar--right__content {
@@ -35,20 +39,6 @@
         @include flex-direction(column);
         height: calc(100% - 56px);
         @include border-radius(2px 0 0 0);
-    }
-    .post {
-        .post-header {
-            .post-header-col {
-                &.post-header__reply {
-                    min-width: 30px;
-                    text-align: right;
-                    float: right;
-                }
-            }
-        }
-        .post-body {
-            margin: 3px 0 0;
-        }
     }
     .sidebar__overlay {
         width: 100%;
@@ -106,6 +96,10 @@
             font-size: 0.95em;
             padding-bottom: 10px;
         }
+    }
+
+    .suggestion-content {
+        max-height: 120px;
     }
 }
 

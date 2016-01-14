@@ -4,7 +4,7 @@
 package manualtesting
 
 import (
-	l4g "code.google.com/p/log4go"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/mattermost/platform/api"
 	"github.com/mattermost/platform/model"
 	"github.com/mattermost/platform/utils"
@@ -114,7 +114,7 @@ func manualTest(c *api.Context, w http.ResponseWriter, r *http.Request) {
 			Name:     model.SESSION_COOKIE_TOKEN,
 			Value:    client.AuthToken,
 			Path:     "/",
-			MaxAge:   model.SESSION_TIME_WEB_IN_SECS,
+			MaxAge:   *utils.Cfg.ServiceSettings.SessionLengthWebInDays * 60 * 60 * 24,
 			HttpOnly: true,
 		}
 		http.SetCookie(w, sessionCookie)

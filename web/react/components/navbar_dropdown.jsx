@@ -1,16 +1,18 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var Utils = require('../utils/utils.jsx');
-var client = require('../utils/client.jsx');
-var UserStore = require('../stores/user_store.jsx');
-var TeamStore = require('../stores/team_store.jsx');
+import * as Utils from '../utils/utils.jsx';
+import * as client from '../utils/client.jsx';
+import UserStore from '../stores/user_store.jsx';
+import TeamStore from '../stores/team_store.jsx';
+import * as EventHelpers from '../dispatcher/event_helpers.jsx';
 
-var AboutBuildModal = require('./about_build_modal.jsx');
-var InviteMemberModal = require('./invite_member_modal.jsx');
-var UserSettingsModal = require('./user_settings/user_settings_modal.jsx');
+import AboutBuildModal from './about_build_modal.jsx';
+import TeamMembersModal from './team_members_modal.jsx';
+import ToggleModalButton from './toggle_modal_button.jsx';
+import UserSettingsModal from './user_settings/user_settings_modal.jsx';
 
-var Constants = require('../utils/constants.jsx');
+import Constants from '../utils/constants.jsx';
 
 function getStateFromStores() {
     const teams = [];
@@ -93,7 +95,7 @@ export default class NavbarDropdown extends React.Component {
                 <li>
                     <a
                         href='#'
-                        onClick={InviteMemberModal.show}
+                        onClick={EventHelpers.showInviteMemberModal}
                     >
                         {'Invite New Member'}
                     </a>
@@ -105,10 +107,7 @@ export default class NavbarDropdown extends React.Component {
                     <li>
                         <a
                             href='#'
-                            data-toggle='modal'
-                            data-target='#get_link'
-                            data-title='Team Invite'
-                            data-value={Utils.getWindowLocationOrigin() + '/signup_user_complete/?id=' + TeamStore.getCurrent().invite_id}
+                            onClick={EventHelpers.showGetTeamInviteLinkModal}
                         >
                             {'Get Team Invite Link'}
                         </a>
@@ -120,13 +119,9 @@ export default class NavbarDropdown extends React.Component {
         if (isAdmin) {
             manageLink = (
                 <li>
-                    <a
-                        href='#'
-                        data-toggle='modal'
-                        data-target='#team_members'
-                    >
+                    <ToggleModalButton dialogType={TeamMembersModal}>
                         {'Manage Members'}
-                    </a>
+                    </ToggleModalButton>
                 </li>
             );
 
@@ -189,6 +184,34 @@ export default class NavbarDropdown extends React.Component {
             );
         }
 
+        let helpLink = null;
+        if (global.window.mm_config.HelpLink) {
+            helpLink = (
+                <li>
+                    <a
+                        target='_blank'
+                        href={global.window.mm_config.HelpLink}
+                    >
+                        {'Help'}
+                    </a>
+                </li>
+            );
+        }
+
+        let reportLink = null;
+        if (global.window.mm_config.ReportAProblemLink) {
+            reportLink = (
+                <li>
+                    <a
+                        target='_blank'
+                        href={global.window.mm_config.ReportAProblemLink}
+                    >
+                        {'Report a Problem'}
+                    </a>
+                </li>
+            );
+        }
+
         return (
             <ul className='nav navbar-nav navbar-right'>
                 <li
@@ -235,22 +258,8 @@ export default class NavbarDropdown extends React.Component {
                         {sysAdminLink}
                         {teams}
                         <li className='divider'></li>
-                        <li>
-                            <a
-                                target='_blank'
-                                href='/static/help/help.html'
-                            >
-                                {'Help'}
-                            </a>
-                        </li>
-                        <li>
-                            <a
-                                target='_blank'
-                                href='/static/help/report_problem.html'
-                            >
-                                {'Report a Problem'}
-                            </a>
-                        </li>
+                        {helpLink}
+                        {reportLink}
                         <li>
                             <a
                                 href='#'

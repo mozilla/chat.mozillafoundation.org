@@ -4,7 +4,6 @@
 package store
 
 import (
-	l4g "code.google.com/p/log4go"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/hmac"
@@ -16,6 +15,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	l4g "github.com/alecthomas/log4go"
 	"io"
 	sqltrace "log"
 	"math/rand"
@@ -147,6 +147,8 @@ func NewSqlStore() Store {
 	sqlStore.system.(*SqlSystemStore).CreateIndexesIfNotExists()
 	sqlStore.webhook.(*SqlWebhookStore).CreateIndexesIfNotExists()
 	sqlStore.preference.(*SqlPreferenceStore).CreateIndexesIfNotExists()
+
+	sqlStore.preference.(*SqlPreferenceStore).DeleteUnusedFeatures()
 
 	if model.IsPreviousVersion(schemaVersion) || isSchemaVersion07 || isSchemaVersion10 {
 		sqlStore.system.Update(&model.System{Name: "Version", Value: model.CurrentVersion})

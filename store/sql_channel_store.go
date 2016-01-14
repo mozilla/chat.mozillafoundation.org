@@ -145,18 +145,20 @@ func (s SqlChannelStore) saveChannelT(transaction *gorp.Transaction, channel *mo
 		return result
 	}
 
-	if count, err := transaction.SelectInt("SELECT COUNT(0) FROM Channels WHERE TeamId = :TeamId AND DeleteAt = 0 AND (Type = 'O' OR Type = 'P')", map[string]interface{}{"TeamId": channel.TeamId}); err != nil {
-		result.Err = model.NewAppError("SqlChannelStore.Save", "Failed to get current channel count", "teamId="+channel.TeamId+", "+err.Error())
-		return result
-	} else if count > 150 {
-		result.Err = model.NewAppError("SqlChannelStore.Save", "You've reached the limit of the number of allowed channels.", "teamId="+channel.TeamId)
-		return result
+	if channel.Type != model.CHANNEL_DIRECT {
+		if count, err := transaction.SelectInt("SELECT COUNT(0) FROM Channels WHERE TeamId = :TeamId AND DeleteAt = 0 AND (Type = 'O' OR Type = 'P')", map[string]interface{}{"TeamId": channel.TeamId}); err != nil {
+			result.Err = model.NewAppError("SqlChannelStore.Save", "Failed to get current channel count", "teamId="+channel.TeamId+", "+err.Error())
+			return result
+		} else if count > 1000 {
+			result.Err = model.NewAppError("SqlChannelStore.Save", "You've reached the limit of the number of allowed channels.", "teamId="+channel.TeamId)
+			return result
+		}
 	}
 
 	if err := transaction.Insert(channel); err != nil {
 		if IsUniqueConstraintError(err.Error(), "Name", "channels_name_teamid_key") {
 			dupChannel := model.Channel{}
-			s.GetReplica().SelectOne(&dupChannel, "SELECT * FROM Channels WHERE TeamId = :TeamId AND Name = :Name AND DeleteAt > 0", map[string]interface{}{"TeamId": channel.TeamId, "Name": channel.Name})
+			s.GetMaster().SelectOne(&dupChannel, "SELECT * FROM Channels WHERE TeamId = :TeamId AND Name = :Name AND DeleteAt > 0", map[string]interface{}{"TeamId": channel.TeamId, "Name": channel.Name})
 			if dupChannel.DeleteAt > 0 {
 				result.Err = model.NewAppError("SqlChannelStore.Update", "A channel with that URL was previously created", "id="+channel.Id+", "+err.Error())
 			} else {
@@ -241,12 +243,27 @@ func (s SqlChannelStore) extraUpdated(channel *model.Channel) StoreChannel {
 }
 
 func (s SqlChannelStore) Get(id string) StoreChannel {
+	return s.get(id, false)
+}
+
+func (s SqlChannelStore) GetFromMaster(id string) StoreChannel {
+	return s.get(id, true)
+}
+
+func (s SqlChannelStore) get(id string, master bool) StoreChannel {
 	storeChannel := make(StoreChannel)
 
 	go func() {
 		result := StoreResult{}
 
-		if obj, err := s.GetReplica().Get(model.Channel{}, id); err != nil {
+		var db *gorp.DbMap
+		if master {
+			db = s.GetMaster()
+		} else {
+			db = s.GetReplica()
+		}
+
+		if obj, err := db.Get(model.Channel{}, id); err != nil {
 			result.Err = model.NewAppError("SqlChannelStore.Get", "We encountered an error finding the channel", "id="+id+", "+err.Error())
 		} else if obj == nil {
 			result.Err = model.NewAppError("SqlChannelStore.Get", "We couldn't find the existing channel", "id="+id)
@@ -270,6 +287,23 @@ func (s SqlChannelStore) Delete(channelId string, time int64) StoreChannel {
 		_, err := s.GetMaster().Exec("Update Channels SET DeleteAt = :Time, UpdateAt = :Time WHERE Id = :ChannelId", map[string]interface{}{"Time": time, "ChannelId": channelId})
 		if err != nil {
 			result.Err = model.NewAppError("SqlChannelStore.Delete", "We couldn't delete the channel", "id="+channelId+", err="+err.Error())
+		}
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (s SqlChannelStore) PermanentDeleteByTeam(teamId string) StoreChannel {
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		if _, err := s.GetMaster().Exec("DELETE FROM Channels WHERE TeamId = :TeamId", map[string]interface{}{"TeamId": teamId}); err != nil {
+			result.Err = model.NewAppError("SqlChannelStore.PermanentDeleteByTeam", "We couldn't delete the channels", "teamId="+teamId+", "+err.Error())
 		}
 
 		storeChannel <- result
@@ -421,7 +455,7 @@ func (s SqlChannelStore) SaveMember(member *model.ChannelMember) StoreChannel {
 	go func() {
 		var result StoreResult
 		// Grab the channel we are saving this member to
-		if cr := <-s.Get(member.ChannelId); cr.Err != nil {
+		if cr := <-s.GetFromMaster(member.ChannelId); cr.Err != nil {
 			result.Err = cr.Err
 		} else {
 			channel := cr.Data.(*model.Channel)
@@ -569,12 +603,19 @@ func (s SqlChannelStore) GetExtraMembers(channelId string, limit int) StoreChann
 		result := StoreResult{}
 
 		var members []model.ExtraMember
-		_, err := s.GetReplica().Select(&members, "SELECT Id, Nickname, Email, ChannelMembers.Roles, Username FROM ChannelMembers, Users WHERE ChannelMembers.UserId = Users.Id AND ChannelId = :ChannelId LIMIT :Limit", map[string]interface{}{"ChannelId": channelId, "Limit": limit})
+		var err error
+
+		if limit != -1 {
+			_, err = s.GetReplica().Select(&members, "SELECT Id, Nickname, Email, ChannelMembers.Roles, Username FROM ChannelMembers, Users WHERE ChannelMembers.UserId = Users.Id AND ChannelId = :ChannelId LIMIT :Limit", map[string]interface{}{"ChannelId": channelId, "Limit": limit})
+		} else {
+			_, err = s.GetReplica().Select(&members, "SELECT Id, Nickname, Email, ChannelMembers.Roles, Username FROM ChannelMembers, Users WHERE ChannelMembers.UserId = Users.Id AND ChannelId = :ChannelId", map[string]interface{}{"ChannelId": channelId})
+		}
+
 		if err != nil {
 			result.Err = model.NewAppError("SqlChannelStore.GetExtraMembers", "We couldn't get the extra info for channel members", "channel_id="+channelId+", "+err.Error())
 		} else {
 			for i := range members {
-				members[i].Sanitize(utils.SanitizeOptions)
+				members[i].Sanitize(utils.Cfg.GetSanitizeOptions())
 			}
 			result.Data = members
 		}
@@ -607,6 +648,23 @@ func (s SqlChannelStore) RemoveMember(channelId string, userId string) StoreChan
 					result.Err = mu.Err
 				}
 			}
+		}
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (s SqlChannelStore) PermanentDeleteMembersByUser(userId string) StoreChannel {
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		if _, err := s.GetMaster().Exec("DELETE FROM ChannelMembers WHERE UserId = :UserId", map[string]interface{}{"UserId": userId}); err != nil {
+			result.Err = model.NewAppError("SqlChannelStore.RemoveMember", "We couldn't remove the channel member", "user_id="+userId+", "+err.Error())
 		}
 
 		storeChannel <- result

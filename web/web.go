@@ -4,8 +4,8 @@
 package web
 
 import (
-	l4g "code.google.com/p/log4go"
 	"fmt"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/gorilla/mux"
 	"github.com/mattermost/platform/api"
 	"github.com/mattermost/platform/model"
@@ -32,7 +32,7 @@ func NewHtmlTemplatePage(templateName string, title string) *HtmlTemplatePage {
 
 	props := make(map[string]string)
 	props["Title"] = title
-	return &HtmlTemplatePage{TemplateName: templateName, Props: props, ClientCfg: utils.ClientCfg}
+	return &HtmlTemplatePage{TemplateName: templateName, Props: props, ClientCfg: utils.ClientCfg, ClientLicense: utils.ClientLicense}
 }
 
 func (me *HtmlTemplatePage) Render(c *api.Context, w http.ResponseWriter) {
@@ -70,8 +70,9 @@ func InitWeb() {
 	mainrouter.Handle("/verify_email", api.AppHandlerIndependent(verifyEmail)).Methods("GET")
 	mainrouter.Handle("/find_team", api.AppHandlerIndependent(findTeam)).Methods("GET")
 	mainrouter.Handle("/signup_team", api.AppHandlerIndependent(signup)).Methods("GET")
-	mainrouter.Handle("/login/{service:[A-Za-z]+}/complete", api.AppHandlerIndependent(loginCompleteOAuth)).Methods("GET")
-	mainrouter.Handle("/signup/{service:[A-Za-z]+}/complete", api.AppHandlerIndependent(signupCompleteOAuth)).Methods("GET")
+	mainrouter.Handle("/login/{service:[A-Za-z]+}/complete", api.AppHandlerIndependent(completeOAuth)).Methods("GET")  // Remove after a few releases (~1.8)
+	mainrouter.Handle("/signup/{service:[A-Za-z]+}/complete", api.AppHandlerIndependent(completeOAuth)).Methods("GET") // Remove after a few releases (~1.8)
+	mainrouter.Handle("/{service:[A-Za-z]+}/complete", api.AppHandlerIndependent(completeOAuth)).Methods("GET")
 
 	mainrouter.Handle("/admin_console", api.UserRequired(adminConsole)).Methods("GET")
 	mainrouter.Handle("/admin_console/", api.UserRequired(adminConsole)).Methods("GET")
@@ -79,6 +80,8 @@ func InitWeb() {
 	mainrouter.Handle("/admin_console/{tab:[A-Za-z0-9-_]+}/{team:[A-Za-z0-9-]*}", api.UserRequired(adminConsole)).Methods("GET")
 
 	mainrouter.Handle("/hooks/{id:[A-Za-z0-9]+}", api.ApiAppHandler(incomingWebhook)).Methods("POST")
+
+	mainrouter.Handle("/docs/{doc:[A-Za-z0-9]+}", api.AppHandlerIndependent(docs)).Methods("GET")
 
 	// ----------------------------------------------------------------------------------------------
 	// *ANYTHING* team specific should go below this line
@@ -89,6 +92,8 @@ func InitWeb() {
 	mainrouter.Handle("/{team:[A-Za-z0-9-]+(__)?[A-Za-z0-9-]+}/login", api.AppHandler(login)).Methods("GET")
 	mainrouter.Handle("/{team:[A-Za-z0-9-]+(__)?[A-Za-z0-9-]+}/logout", api.AppHandler(logout)).Methods("GET")
 	mainrouter.Handle("/{team:[A-Za-z0-9-]+(__)?[A-Za-z0-9-]+}/reset_password", api.AppHandler(resetPassword)).Methods("GET")
+	mainrouter.Handle("/{team:[A-Za-z0-9-]+(__)?[A-Za-z0-9-]+}/claim", api.AppHandler(claimAccount)).Methods("GET")
+	mainrouter.Handle("/{team}/pl/{postid}", api.AppHandler(postPermalink)).Methods("GET")         // Bug in gorilla.mux prevents us from using regex here.
 	mainrouter.Handle("/{team}/login/{service}", api.AppHandler(loginWithOAuth)).Methods("GET")    // Bug in gorilla.mux prevents us from using regex here.
 	mainrouter.Handle("/{team}/channels/{channelname}", api.AppHandler(getChannel)).Methods("GET") // Bug in gorilla.mux prevents us from using regex here.
 	mainrouter.Handle("/{team}/signup/{service}", api.AppHandler(signupWithOAuth)).Methods("GET")  // Bug in gorilla.mux prevents us from using regex here.
@@ -235,7 +240,14 @@ func login(c *api.Context, w http.ResponseWriter, r *http.Request) {
 	_, session := api.FindMultiSessionForTeamId(r, team.Id)
 	if session != nil {
 		w.Header().Set(model.HEADER_TOKEN, session.Token)
-		http.Redirect(w, r, c.GetSiteURL()+"/"+team.Name+"/channels/town-square", http.StatusTemporaryRedirect)
+		lastViewChannelName := "town-square"
+		if lastViewResult := <-api.Srv.Store.Preference().Get(session.UserId, model.PREFERENCE_CATEGORY_LAST, model.PREFERENCE_NAME_LAST_CHANNEL); lastViewResult.Err == nil {
+			if lastViewChannelResult := <-api.Srv.Store.Channel().Get(lastViewResult.Data.(model.Preference).Value); lastViewChannelResult.Err == nil {
+				lastViewChannelName = lastViewChannelResult.Data.(*model.Channel).Name
+			}
+		}
+
+		http.Redirect(w, r, c.GetSiteURL()+"/"+team.Name+"/channels/"+lastViewChannelName, http.StatusTemporaryRedirect)
 		return
 	}
 
@@ -340,15 +352,142 @@ func logout(c *api.Context, w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, c.GetTeamURL(), http.StatusTemporaryRedirect)
 }
 
+func postPermalink(c *api.Context, w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	teamName := params["team"]
+	postId := params["postid"]
+
+	if len(postId) != 26 {
+		c.Err = model.NewAppError("postPermalink", "Invalid Post ID", "id="+postId)
+		return
+	}
+
+	team := checkSessionSwitch(c, w, r, teamName)
+	if team == nil {
+		// Error already set by getTeam
+		return
+	}
+
+	var post *model.Post
+	if result := <-api.Srv.Store.Post().Get(postId); result.Err != nil {
+		c.Err = result.Err
+		return
+	} else {
+		postlist := result.Data.(*model.PostList)
+		post = postlist.Posts[postlist.Order[0]]
+	}
+
+	var channel *model.Channel
+	if result := <-api.Srv.Store.Channel().CheckPermissionsTo(c.Session.TeamId, post.ChannelId, c.Session.UserId); result.Err != nil {
+		c.Err = result.Err
+		return
+	} else {
+		if result.Data.(int64) == 0 {
+			if channel = autoJoinChannelId(c, w, r, post.ChannelId); channel == nil {
+				http.Redirect(w, r, c.GetTeamURL()+"/channels/town-square", http.StatusFound)
+				return
+			}
+		} else {
+			if result := <-api.Srv.Store.Channel().Get(post.ChannelId); result.Err != nil {
+				c.Err = result.Err
+				return
+			} else {
+				channel = result.Data.(*model.Channel)
+			}
+		}
+	}
+
+	doLoadChannel(c, w, r, team, channel, post.Id)
+}
+
 func getChannel(c *api.Context, w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	name := params["channelname"]
 	teamName := params["team"]
 
+	team := checkSessionSwitch(c, w, r, teamName)
+	if team == nil {
+		// Error already set by getTeam
+		return
+	}
+
+	var channel *model.Channel
+	if result := <-api.Srv.Store.Channel().CheckPermissionsToByName(c.Session.TeamId, name, c.Session.UserId); result.Err != nil {
+		c.Err = result.Err
+		return
+	} else {
+		channelId := result.Data.(string)
+		if len(channelId) == 0 {
+			if channel = autoJoinChannelName(c, w, r, name); channel == nil {
+				http.Redirect(w, r, c.GetTeamURL()+"/channels/town-square", http.StatusFound)
+				return
+			}
+		} else {
+			if result := <-api.Srv.Store.Channel().Get(channelId); result.Err != nil {
+				c.Err = result.Err
+				return
+			} else {
+				channel = result.Data.(*model.Channel)
+			}
+		}
+	}
+
+	doLoadChannel(c, w, r, team, channel, "")
+}
+
+func autoJoinChannelName(c *api.Context, w http.ResponseWriter, r *http.Request, channelName string) *model.Channel {
+	if strings.Index(channelName, "__") > 0 {
+		// It's a direct message channel that doesn't exist yet so let's create it
+		ids := strings.Split(channelName, "__")
+		otherUserId := ""
+		if ids[0] == c.Session.UserId {
+			otherUserId = ids[1]
+		} else {
+			otherUserId = ids[0]
+		}
+
+		if sc, err := api.CreateDirectChannel(c, otherUserId); err != nil {
+			api.Handle404(w, r)
+			return nil
+		} else {
+			return sc
+		}
+	} else {
+		// We will attempt to auto-join open channels
+		return joinOpenChannel(c, w, r, api.Srv.Store.Channel().GetByName(c.Session.TeamId, channelName))
+	}
+
+	return nil
+}
+
+func autoJoinChannelId(c *api.Context, w http.ResponseWriter, r *http.Request, channelId string) *model.Channel {
+	return joinOpenChannel(c, w, r, api.Srv.Store.Channel().Get(channelId))
+}
+
+func joinOpenChannel(c *api.Context, w http.ResponseWriter, r *http.Request, channel store.StoreChannel) *model.Channel {
+	if cr := <-channel; cr.Err != nil {
+		http.Redirect(w, r, c.GetTeamURL()+"/channels/town-square", http.StatusFound)
+		return nil
+	} else {
+		channel := cr.Data.(*model.Channel)
+		if channel.Type == model.CHANNEL_OPEN {
+			api.JoinChannel(c, channel.Id, "")
+			if c.Err != nil {
+				return nil
+			}
+		} else {
+			http.Redirect(w, r, c.GetTeamURL()+"/channels/town-square", http.StatusFound)
+			return nil
+		}
+		return channel
+	}
+}
+
+func checkSessionSwitch(c *api.Context, w http.ResponseWriter, r *http.Request, teamName string) *model.Team {
 	var team *model.Team
 	if result := <-api.Srv.Store.Team().GetByName(teamName); result.Err != nil {
 		c.Err = result.Err
-		return
+		return nil
 	} else {
 		team = result.Data.(*model.Team)
 	}
@@ -366,15 +505,11 @@ func getChannel(c *api.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	userChan := api.Srv.Store.User().Get(c.Session.UserId)
+	return team
+}
 
-	var channelId string
-	if result := <-api.Srv.Store.Channel().CheckPermissionsToByName(c.Session.TeamId, name, c.Session.UserId); result.Err != nil {
-		c.Err = result.Err
-		return
-	} else {
-		channelId = result.Data.(string)
-	}
+func doLoadChannel(c *api.Context, w http.ResponseWriter, r *http.Request, team *model.Team, channel *model.Channel, postid string) {
+	userChan := api.Srv.Store.User().Get(c.Session.UserId)
 
 	var user *model.User
 	if ur := <-userChan; ur.Err != nil {
@@ -386,54 +521,15 @@ func getChannel(c *api.Context, w http.ResponseWriter, r *http.Request) {
 		user = ur.Data.(*model.User)
 	}
 
-	if len(channelId) == 0 {
-		if strings.Index(name, "__") > 0 {
-			// It's a direct message channel that doesn't exist yet so let's create it
-			ids := strings.Split(name, "__")
-			otherUserId := ""
-			if ids[0] == c.Session.UserId {
-				otherUserId = ids[1]
-			} else {
-				otherUserId = ids[0]
-			}
-
-			if sc, err := api.CreateDirectChannel(c, otherUserId); err != nil {
-				api.Handle404(w, r)
-				return
-			} else {
-				channelId = sc.Id
-			}
-		} else {
-			// We will attempt to auto-join open channels
-			if cr := <-api.Srv.Store.Channel().GetByName(c.Session.TeamId, name); cr.Err != nil {
-				http.Redirect(w, r, c.GetTeamURL()+"/channels/town-square", http.StatusFound)
-			} else {
-				channel := cr.Data.(*model.Channel)
-				if channel.Type == model.CHANNEL_OPEN {
-					api.JoinChannel(c, channel.Id, "")
-					if c.Err != nil {
-						return
-					}
-
-					channelId = channel.Id
-				} else {
-					http.Redirect(w, r, c.GetTeamURL()+"/channels/town-square", http.StatusFound)
-				}
-			}
-		}
-	}
-
 	page := NewHtmlTemplatePage("channel", "")
-	page.Props["Title"] = name + " - " + team.DisplayName + " " + page.ClientCfg["SiteName"]
+	page.Props["Title"] = channel.DisplayName + " - " + team.DisplayName + " " + page.ClientCfg["SiteName"]
 	page.Props["TeamDisplayName"] = team.DisplayName
-	page.Props["TeamName"] = team.Name
-	page.Props["TeamType"] = team.Type
-	page.Props["TeamId"] = team.Id
-	page.Props["ChannelName"] = name
-	page.Props["ChannelId"] = channelId
-	page.Props["UserId"] = c.Session.UserId
+	page.Props["ChannelName"] = channel.Name
+	page.Props["ChannelId"] = channel.Id
+	page.Props["PostId"] = postid
 	page.Team = team
 	page.User = user
+	page.Channel = channel
 	page.Render(c, w)
 }
 
@@ -477,7 +573,7 @@ func verifyEmail(c *api.Context, w http.ResponseWriter, r *http.Request) {
 			return
 		} else {
 			c.LogAudit("Email Verified")
-			http.Redirect(w, r, api.GetProtocol(r)+"://"+r.Host+"/"+name+"/login?verified=true&email="+email, http.StatusTemporaryRedirect)
+			http.Redirect(w, r, api.GetProtocol(r)+"://"+r.Host+"/"+name+"/login?extra=verified&email="+url.QueryEscape(email), http.StatusTemporaryRedirect)
 			return
 		}
 	}
@@ -491,6 +587,15 @@ func verifyEmail(c *api.Context, w http.ResponseWriter, r *http.Request) {
 
 func findTeam(c *api.Context, w http.ResponseWriter, r *http.Request) {
 	page := NewHtmlTemplatePage("find_team", "Find Team")
+	page.Render(c, w)
+}
+
+func docs(c *api.Context, w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	doc := params["doc"]
+
+	page := NewHtmlTemplatePage("docs", "Documentation")
+	page.Props["Site"] = doc
 	page.Render(c, w)
 }
 
@@ -547,6 +652,12 @@ func signupWithOAuth(c *api.Context, w http.ResponseWriter, r *http.Request) {
 	service := params["service"]
 	teamName := params["team"]
 
+	if !utils.Cfg.TeamSettings.EnableUserCreation {
+		c.Err = model.NewAppError("signupTeam", "User sign-up is disabled.", "")
+		c.Err.StatusCode = http.StatusNotImplemented
+		return
+	}
+
 	if len(teamName) == 0 {
 		c.Err = model.NewAppError("signupWithOAuth", "Invalid team name", "team_name="+teamName)
 		c.Err.StatusCode = http.StatusBadRequest
@@ -584,85 +695,63 @@ func signupWithOAuth(c *api.Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	redirectUri := c.GetSiteURL() + "/signup/" + service + "/complete"
+	stateProps := map[string]string{}
+	stateProps["action"] = model.OAUTH_ACTION_SIGNUP
 
-	api.GetAuthorizationCode(c, w, r, teamName, service, redirectUri, "")
+	if authUrl, err := api.GetAuthorizationCode(c, service, teamName, stateProps, ""); err != nil {
+		c.Err = err
+		return
+	} else {
+		http.Redirect(w, r, authUrl, http.StatusFound)
+	}
 }
 
-func signupCompleteOAuth(c *api.Context, w http.ResponseWriter, r *http.Request) {
+func completeOAuth(c *api.Context, w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	service := params["service"]
 
 	code := r.URL.Query().Get("code")
 	state := r.URL.Query().Get("state")
 
-	uri := c.GetSiteURL() + "/signup/" + service + "/complete"
+	uri := c.GetSiteURL() + "/signup/" + service + "/complete" // Remove /signup after a few releases (~1.8)
 
-	if body, team, err := api.AuthorizeOAuthUser(service, code, state, uri); err != nil {
+	if body, team, props, err := api.AuthorizeOAuthUser(service, code, state, uri); err != nil {
 		c.Err = err
 		return
 	} else {
-		var user *model.User
-		if service == model.USER_AUTH_SERVICE_GITLAB {
-			glu := model.GitLabUserFromJson(body)
-			user = model.UserFromGitLabUser(glu)
-		}
-
-		if user == nil {
-			c.Err = model.NewAppError("signupCompleteOAuth", "Could not create user out of "+service+" user object", "")
-			return
-		}
-
-		suchan := api.Srv.Store.User().GetByAuth(team.Id, user.AuthData, service)
-		euchan := api.Srv.Store.User().GetByEmail(team.Id, user.Email)
-
-		if team.Email == "" {
-			team.Email = user.Email
-			if result := <-api.Srv.Store.Team().Update(team); result.Err != nil {
-				c.Err = result.Err
-				return
+		action := props["action"]
+		switch action {
+		case model.OAUTH_ACTION_SIGNUP:
+			api.CreateOAuthUser(c, w, r, service, body, team)
+			if c.Err == nil {
+				root(c, w, r)
 			}
-		} else {
-			found := true
-			count := 0
-			for found {
-				if found = api.IsUsernameTaken(user.Username, team.Id); c.Err != nil {
-					return
-				} else if found {
-					user.Username = user.Username + strconv.Itoa(count)
-					count += 1
-				}
+			break
+		case model.OAUTH_ACTION_LOGIN:
+			api.LoginByOAuth(c, w, r, service, body, team)
+			if c.Err == nil {
+				root(c, w, r)
 			}
+			break
+		case model.OAUTH_ACTION_EMAIL_TO_SSO:
+			api.CompleteSwitchWithOAuth(c, w, r, service, body, team, props["email"])
+			if c.Err == nil {
+				http.Redirect(w, r, api.GetProtocol(r)+"://"+r.Host+"/"+team.Name+"/login?extra=signin_change", http.StatusTemporaryRedirect)
+			}
+			break
+		case model.OAUTH_ACTION_SSO_TO_EMAIL:
+			api.LoginByOAuth(c, w, r, service, body, team)
+			if c.Err == nil {
+				http.Redirect(w, r, api.GetProtocol(r)+"://"+r.Host+"/"+team.Name+"/"+"/claim?email="+url.QueryEscape(props["email"]), http.StatusTemporaryRedirect)
+			}
+			break
+		default:
+			api.LoginByOAuth(c, w, r, service, body, team)
+			if c.Err == nil {
+				root(c, w, r)
+			}
+			break
 		}
-
-		if result := <-suchan; result.Err == nil {
-			c.Err = model.NewAppError("signupCompleteOAuth", "This "+service+" account has already been used to sign up for team "+team.DisplayName, "email="+user.Email)
-			return
-		}
-
-		if result := <-euchan; result.Err == nil {
-			c.Err = model.NewAppError("signupCompleteOAuth", "Team "+team.DisplayName+" already has a user with the email address attached to your "+service+" account", "email="+user.Email)
-			return
-		}
-
-		user.TeamId = team.Id
-		user.EmailVerified = true
-
-		ruser := api.CreateUser(c, team, user)
-		if c.Err != nil {
-			return
-		}
-
-		api.Login(c, w, r, ruser, "")
-
-		if c.Err != nil {
-			return
-		}
-
-		page := NewHtmlTemplatePage("home", "Home")
-		page.Team = team
-		page.User = ruser
-		page.Render(c, w)
 	}
 }
 
@@ -684,54 +773,14 @@ func loginWithOAuth(c *api.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	redirectUri := c.GetSiteURL() + "/login/" + service + "/complete"
+	stateProps := map[string]string{}
+	stateProps["action"] = model.OAUTH_ACTION_LOGIN
 
-	api.GetAuthorizationCode(c, w, r, teamName, service, redirectUri, loginHint)
-}
-
-func loginCompleteOAuth(c *api.Context, w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	service := params["service"]
-
-	code := r.URL.Query().Get("code")
-	state := r.URL.Query().Get("state")
-
-	uri := c.GetSiteURL() + "/login/" + service + "/complete"
-
-	if body, team, err := api.AuthorizeOAuthUser(service, code, state, uri); err != nil {
+	if authUrl, err := api.GetAuthorizationCode(c, service, teamName, stateProps, loginHint); err != nil {
 		c.Err = err
 		return
 	} else {
-		authData := ""
-		if service == model.USER_AUTH_SERVICE_GITLAB {
-			glu := model.GitLabUserFromJson(body)
-			authData = glu.GetAuthData()
-		}
-
-		if len(authData) == 0 {
-			c.Err = model.NewAppError("loginCompleteOAuth", "Could not parse auth data out of "+service+" user object", "")
-			return
-		}
-
-		var user *model.User
-		if result := <-api.Srv.Store.User().GetByAuth(team.Id, authData, service); result.Err != nil {
-			c.Err = result.Err
-			return
-		} else {
-			user = result.Data.(*model.User)
-			api.Login(c, w, r, user, "")
-
-			if c.Err != nil {
-				return
-			}
-
-			page := NewHtmlTemplatePage("home", "Home")
-			page.Team = team
-			page.User = user
-			page.Render(c, w)
-
-			root(c, w, r)
-		}
+		http.Redirect(w, r, authUrl, http.StatusFound)
 	}
 }
 
@@ -951,7 +1000,7 @@ func getAccessToken(c *api.Context, w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessRsp := &model.AccessResponse{AccessToken: session.Token, TokenType: model.ACCESS_TOKEN_TYPE, ExpiresIn: model.SESSION_TIME_OAUTH_IN_SECS}
+	accessRsp := &model.AccessResponse{AccessToken: session.Token, TokenType: model.ACCESS_TOKEN_TYPE, ExpiresIn: int32(*utils.Cfg.ServiceSettings.SessionLengthSSOInDays * 60 * 60 * 24)}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
@@ -977,7 +1026,8 @@ func incomingWebhook(c *api.Context, w http.ResponseWriter, r *http.Request) {
 	r.ParseForm()
 
 	var parsedRequest *model.IncomingWebhookRequest
-	if r.Header.Get("Content-Type") == "application/json" {
+	contentType := r.Header.Get("Content-Type")
+	if strings.Split(contentType, "; ")[0] == "application/json" {
 		parsedRequest = model.IncomingWebhookRequestFromJson(r.Body)
 	} else {
 		parsedRequest = model.IncomingWebhookRequestFromJson(strings.NewReader(r.FormValue("payload")))
@@ -1061,4 +1111,59 @@ func incomingWebhook(c *api.Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.Write([]byte("ok"))
+}
+
+func claimAccount(c *api.Context, w http.ResponseWriter, r *http.Request) {
+	if !CheckBrowserCompatability(c, r) {
+		return
+	}
+
+	params := mux.Vars(r)
+	teamName := params["team"]
+	email := r.URL.Query().Get("email")
+	newType := r.URL.Query().Get("new_type")
+
+	var team *model.Team
+	if tResult := <-api.Srv.Store.Team().GetByName(teamName); tResult.Err != nil {
+		l4g.Error("Couldn't find team name=%v, err=%v", teamName, tResult.Err.Message)
+		http.Redirect(w, r, api.GetProtocol(r)+"://"+r.Host, http.StatusTemporaryRedirect)
+		return
+	} else {
+		team = tResult.Data.(*model.Team)
+	}
+
+	authType := ""
+	if len(email) != 0 {
+		if uResult := <-api.Srv.Store.User().GetByEmail(team.Id, email); uResult.Err != nil {
+			l4g.Error("Couldn't find user teamid=%v, email=%v, err=%v", team.Id, email, uResult.Err.Message)
+			http.Redirect(w, r, api.GetProtocol(r)+"://"+r.Host, http.StatusTemporaryRedirect)
+			return
+		} else {
+			user := uResult.Data.(*model.User)
+			authType = user.AuthService
+
+			// if user is not logged in to their SSO account, ask them to log in
+			if len(authType) != 0 && user.Id != c.Session.UserId {
+				stateProps := map[string]string{}
+				stateProps["action"] = model.OAUTH_ACTION_SSO_TO_EMAIL
+				stateProps["email"] = email
+
+				if authUrl, err := api.GetAuthorizationCode(c, authType, team.Name, stateProps, ""); err != nil {
+					c.Err = err
+					return
+				} else {
+					http.Redirect(w, r, authUrl, http.StatusFound)
+				}
+			}
+		}
+	}
+
+	page := NewHtmlTemplatePage("claim_account", "Claim Account")
+	page.Props["Email"] = email
+	page.Props["CurrentType"] = authType
+	page.Props["NewType"] = newType
+	page.Props["TeamDisplayName"] = team.DisplayName
+	page.Props["TeamName"] = team.Name
+
+	page.Render(c, w)
 }

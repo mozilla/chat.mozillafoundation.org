@@ -1,14 +1,62 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-require('./highlight.jsx');
-const TextFormatting = require('./text_formatting.jsx');
-const Utils = require('./utils.jsx');
+import highlightJs from 'highlight.js/lib/highlight.js';
+import highlightJsDiff from 'highlight.js/lib/languages/diff.js';
+import highlightJsApache from 'highlight.js/lib/languages/apache.js';
+import highlightJsMakefile from 'highlight.js/lib/languages/makefile.js';
+import highlightJsHttp from 'highlight.js/lib/languages/http.js';
+import highlightJsJson from 'highlight.js/lib/languages/json.js';
+import highlightJsMarkdown from 'highlight.js/lib/languages/markdown.js';
+import highlightJsJavascript from 'highlight.js/lib/languages/javascript.js';
+import highlightJsCss from 'highlight.js/lib/languages/css.js';
+import highlightJsNginx from 'highlight.js/lib/languages/nginx.js';
+import highlightJsObjectivec from 'highlight.js/lib/languages/objectivec.js';
+import highlightJsPython from 'highlight.js/lib/languages/python.js';
+import highlightJsXml from 'highlight.js/lib/languages/xml.js';
+import highlightJsPerl from 'highlight.js/lib/languages/perl.js';
+import highlightJsBash from 'highlight.js/lib/languages/bash.js';
+import highlightJsPhp from 'highlight.js/lib/languages/php.js';
+import highlightJsCoffeescript from 'highlight.js/lib/languages/coffeescript.js';
+import highlightJsCs from 'highlight.js/lib/languages/cs.js';
+import highlightJsCpp from 'highlight.js/lib/languages/cpp.js';
+import highlightJsSql from 'highlight.js/lib/languages/sql.js';
+import highlightJsGo from 'highlight.js/lib/languages/go.js';
+import highlightJsRuby from 'highlight.js/lib/languages/ruby.js';
+import highlightJsJava from 'highlight.js/lib/languages/java.js';
+import highlightJsIni from 'highlight.js/lib/languages/ini.js';
 
-const highlightJs = require('highlight.js/lib/highlight.js');
-const marked = require('marked');
+highlightJs.registerLanguage('diff', highlightJsDiff);
+highlightJs.registerLanguage('apache', highlightJsApache);
+highlightJs.registerLanguage('makefile', highlightJsMakefile);
+highlightJs.registerLanguage('http', highlightJsHttp);
+highlightJs.registerLanguage('json', highlightJsJson);
+highlightJs.registerLanguage('markdown', highlightJsMarkdown);
+highlightJs.registerLanguage('javascript', highlightJsJavascript);
+highlightJs.registerLanguage('css', highlightJsCss);
+highlightJs.registerLanguage('nginx', highlightJsNginx);
+highlightJs.registerLanguage('objectivec', highlightJsObjectivec);
+highlightJs.registerLanguage('python', highlightJsPython);
+highlightJs.registerLanguage('xml', highlightJsXml);
+highlightJs.registerLanguage('perl', highlightJsPerl);
+highlightJs.registerLanguage('bash', highlightJsBash);
+highlightJs.registerLanguage('php', highlightJsPhp);
+highlightJs.registerLanguage('coffeescript', highlightJsCoffeescript);
+highlightJs.registerLanguage('cs', highlightJsCs);
+highlightJs.registerLanguage('cpp', highlightJsCpp);
+highlightJs.registerLanguage('sql', highlightJsSql);
+highlightJs.registerLanguage('go', highlightJsGo);
+highlightJs.registerLanguage('ruby', highlightJsRuby);
+highlightJs.registerLanguage('java', highlightJsJava);
+highlightJs.registerLanguage('ini', highlightJsIni);
 
-const HighlightedLanguages = require('../utils/constants.jsx').HighlightedLanguages;
+import * as TextFormatting from './text_formatting.jsx';
+import * as Utils from './utils.jsx';
+
+import marked from 'marked';
+
+import Constants from '../utils/constants.jsx';
+const HighlightedLanguages = Constants.HighlightedLanguages;
 
 function markdownImageLoaded(image) {
     image.style.height = 'auto';
@@ -21,13 +69,11 @@ class MattermostInlineLexer extends marked.InlineLexer {
 
         this.rules = Object.assign({}, this.rules);
 
-        // modified version of the regex that doesn't break up words in snake_case,
-        // allows for links starting with www, and allows links succounded by parentheses
+        // modified version of the regex that allows for links starting with www and those surrounded by parentheses
         // the original is /^[\s\S]+?(?=[\\<!\[_*`~]|https?:\/\/| {2,}\n|$)/
-        this.rules.text = /^[\s\S]+?(?:[^\w\/](?=_)|(?=_\W|[\\<!\[*`~]|https?:\/\/|www\.|\(| {2,}\n|$))/;
+        this.rules.text = /^[\s\S]+?(?=[\\<!\[_*`~]|https?:\/\/|www\.|\(| {2,}\n|$)/;
 
-        // modified version of the regex that allows links starting with www and those surrounded
-        // by parentheses
+        // modified version of the regex that allows links starting with www and those surrounded by parentheses
         // the original is /^(https?:\/\/[^\s<]+[^<.,:;"')\]\s])/
         this.rules.url = /^(\(?(?:https?:\/\/|www\.)[^\s<.][^\s<]*[^<.,:;"'\]\s])/;
 
@@ -62,32 +108,47 @@ class MattermostMarkdownRenderer extends marked.Renderer {
         this.formattingOptions = formattingOptions;
     }
 
-    code(code, language) {
-        let usedLanguage = language;
+    code(code, language, escaped) {
+        let usedLanguage = language || '';
+        usedLanguage = usedLanguage.toLowerCase();
 
-        if (String(usedLanguage).toLocaleLowerCase() === 'html') {
+        // treat html as xml to prevent injection attacks
+        if (usedLanguage === 'html') {
             usedLanguage = 'xml';
         }
 
-        if (usedLanguage && (usedLanguage === 'tex' || usedLanguage === 'latex')) {
+        if (HighlightedLanguages[usedLanguage]) {
+            const parsed = highlightJs.highlight(usedLanguage, code);
+
+            return (
+                '<div class="post-body--code">' +
+                    '<span class="post-body--code__language">' +
+                        HighlightedLanguages[usedLanguage] +
+                    '</span>' +
+                    '<pre>' +
+                        '<code class="hljs">' +
+                            parsed.value +
+                        '</code>' +
+                    '</pre>' +
+                '</div>'
+            );
+        } else if (usedLanguage === 'tex' || usedLanguage === 'latex') {
             try {
-                var html = katex.renderToString(TextFormatting.sanitizeHtml(code), {throwOnError: false, displayMode: true});
+                const html = katex.renderToString(TextFormatting.sanitizeHtml(code), {throwOnError: false, displayMode: true});
+
                 return '<div class="post-body--code tex">' + html + '</div>';
             } catch (e) {
-                return '<div class="post-body--code">' + TextFormatting.sanitizeHtml(code) + '</div>';
+                // fall through if latex parsing fails and handle below
             }
         }
 
-        if (!usedLanguage || highlightJs.listLanguages().indexOf(usedLanguage) < 0) {
-            let parsed = super.code(code, usedLanguage);
-            return '<div class="post-body--code"><code class="hljs">' + TextFormatting.sanitizeHtml($(parsed).text()) + '</code></div>';
-        }
-
-        let parsed = highlightJs.highlight(usedLanguage, code);
-        return '<div class="post-body--code">' +
-            '<span class="post-body--code__language">' + HighlightedLanguages[usedLanguage] + '</span>' +
-            '<code class="hljs">' + parsed.value + '</code>' +
-            '</div>';
+        return (
+            '<pre>' +
+                '<code class="hljs">' +
+                    (escaped ? code : TextFormatting.sanitizeHtml(code)) + '\n' +
+                '</code>' +
+            '</pre>'
+        );
     }
 
     br() {
@@ -158,6 +219,16 @@ class MattermostMarkdownRenderer extends marked.Renderer {
 
     table(header, body) {
         return `<table class="markdown__table"><thead>${header}</thead><tbody>${body}</tbody></table>`;
+    }
+
+    listitem(text) {
+        const taskListReg = /^\[([ |xX])\] /;
+        const isTaskList = taskListReg.exec(text);
+
+        if (isTaskList) {
+            return `<li class="list-item--task-list">${'<input type="checkbox" disabled="disabled" ' + (isTaskList[1] === ' ' ? '' : 'checked="checked" ') + '/> '}${text.replace(taskListReg, '')}</li>`;
+        }
+        return `<li>${text}</li>`;
     }
 
     text(txt) {
@@ -298,78 +369,78 @@ class MattermostLexer extends marked.Lexer {
             // list
             cap = this.rules.list.exec(src);
             if (cap) {
+                src = src.substring(cap[0].length);
                 const bull = cap[2];
-                let l = cap[0].length;
+
+                this.tokens.push({
+                    type: 'list_start',
+                    ordered: bull.length > 1
+                });
 
                 // Get each top-level item.
                 cap = cap[0].match(this.rules.item);
 
-                if (cap.length > 1) {
-                    src = src.substring(l);
+                let next = false;
+                const l = cap.length;
+                let i = 0;
 
-                    this.tokens.push({
-                        type: 'list_start',
-                        ordered: bull.length > 1
-                    });
+                for (; i < l; i++) {
+                    let item = cap[i];
 
-                    let next = false;
-                    l = cap.length;
+                    // Remove the list item's bullet
+                    // so it is seen as the next token.
+                    let space = item.length;
+                    item = item.replace(/^ *([*+-]|\d+\.) +/, '');
 
-                    for (let i = 0; i < l; i++) {
-                        let item = cap[i];
+                    // Outdent whatever the
+                    // list item contains. Hacky.
+                    if (~item.indexOf('\n ')) {
+                        space -= item.length;
+                        item = this.options.pedantic ?
+                            item.replace(/^ {1,4}/gm, '') :
+                            item.replace(new RegExp('^ {1,' + space + '}', 'gm'), '');
+                    }
 
-                        // Remove the list item's bullet
-                        // so it is seen as the next token.
-                        let space = item.length;
-                        item = item.replace(/^ *([*+-]|\d+\.) +/, '');
-
-                        // Outdent whatever the
-                        // list item contains. Hacky.
-                        if (~item.indexOf('\n ')) {
-                            space -= item.length;
-                            item = this.options.pedantic ? item.replace(/^ {1,4}/gm, '') : item.replace(new RegExp('^ \{1,' + space + '\}', 'gm'), '');
+                    // Determine whether the next list item belongs here.
+                    // Backpedal if it does not belong in this list.
+                    if (this.options.smartLists && i !== l - 1) {
+                        const b = this.rules.bullet.exec(cap[i + 1])[0];
+                        if (bull !== b && !(bull.length > 1 && b.length > 1)) {
+                            src = cap.slice(i + 1).join('\n') + src;
+                            i = l - 1;
                         }
+                    }
 
-                        // Determine whether the next list item belongs here.
-                        // Backpedal if it does not belong in this list.
-                        if (this.options.smartLists && i !== l - 1) {
-                            const bullet = /(?:[*+-]|\d+\.)/;
-                            const b = bullet.exec(cap[i + 1])[0];
-                            if (bull !== b && !(bull.length > 1 && b.length > 1)) {
-                                src = cap.slice(i + 1).join('\n') + src;
-                                i = l - 1;
-                            }
+                    // Determine whether item is loose or not.
+                    // Use: /(^|\n)(?! )[^\n]+\n\n(?!\s*$)/
+                    // for discount behavior.
+                    let loose = next || (/\n\n(?!\s*$)/).test(item);
+                    if (i !== l - 1) {
+                        next = item.charAt(item.length - 1) === '\n';
+                        if (!loose) {
+                            loose = next;
                         }
-
-                        // Determine whether item is loose or not.
-                        // Use: /(^|\n)(?! )[^\n]+\n\n(?!\s*$)/
-                        // for discount behavior.
-                        let loose = next || (/\n\n(?!\s*$)/).test(item);
-                        if (i !== l - 1) {
-                            next = item.charAt(item.length - 1) === '\n';
-                            if (!loose) {
-                                loose = next;
-                            }
-                        }
-
-                        this.tokens.push({
-                            type: loose ? 'loose_item_start' : 'list_item_start'
-                        });
-
-                        // Recurse.
-                        this.token(item, false, bq);
-
-                        this.tokens.push({
-                            type: 'list_item_end'
-                        });
                     }
 
                     this.tokens.push({
-                        type: 'list_end'
+                        type: loose ?
+                            'loose_item_start' :
+                            'list_item_start'
                     });
 
-                    continue;
+                    // Recurse.
+                    this.token(item, false, bq);
+
+                    this.tokens.push({
+                        type: 'list_item_end'
+                    });
                 }
+
+                this.tokens.push({
+                    type: 'list_end'
+                });
+
+                continue;
             }
 
             // html

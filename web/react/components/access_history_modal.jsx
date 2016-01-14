@@ -2,11 +2,11 @@
 // See License.txt for license information.
 
 var Modal = ReactBootstrap.Modal;
-var UserStore = require('../stores/user_store.jsx');
-var ChannelStore = require('../stores/channel_store.jsx');
-var AsyncClient = require('../utils/async_client.jsx');
-var LoadingScreen = require('./loading_screen.jsx');
-var Utils = require('../utils/utils.jsx');
+import UserStore from '../stores/user_store.jsx';
+import ChannelStore from '../stores/channel_store.jsx';
+import * as AsyncClient from '../utils/async_client.jsx';
+import LoadingScreen from './loading_screen.jsx';
+import * as Utils from '../utils/utils.jsx';
 
 export default class AccessHistoryModal extends React.Component {
     constructor(props) {
@@ -14,8 +14,8 @@ export default class AccessHistoryModal extends React.Component {
 
         this.onAuditChange = this.onAuditChange.bind(this);
         this.handleMoreInfo = this.handleMoreInfo.bind(this);
-        this.onHide = this.onHide.bind(this);
         this.onShow = this.onShow.bind(this);
+        this.onHide = this.onHide.bind(this);
         this.formatAuditInfo = this.formatAuditInfo.bind(this);
         this.handleRevokedSession = this.handleRevokedSession.bind(this);
 
@@ -32,17 +32,23 @@ export default class AccessHistoryModal extends React.Component {
     onShow() {
         AsyncClient.getAudits();
 
-        $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 300);
         if ($(window).width() > 768) {
             $(ReactDOM.findDOMNode(this.refs.modalBody)).perfectScrollbar();
+            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 200);
+        } else {
+            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 150);
         }
     }
     onHide() {
         this.setState({moreInfo: []});
-        this.props.onModalDismissed();
+        this.props.onHide();
     }
     componentDidMount() {
         UserStore.addAuditsChangeListener(this.onAuditChange);
+
+        if (this.props.show) {
+            this.onShow();
+        }
     }
     componentDidUpdate(prevProps) {
         if (this.props.show && !prevProps.show) {
@@ -102,7 +108,7 @@ export default class AccessHistoryModal extends React.Component {
             case '/channels/update_header':
                 currentAuditDesc = 'Updated the ' + channelName + ' channel/group header';
                 break;
-            default:
+            default: {
                 let userIdField = [];
                 let userId = '';
                 let username = '';
@@ -126,11 +132,12 @@ export default class AccessHistoryModal extends React.Component {
 
                 break;
             }
+            }
         } else if (currentActionURL.indexOf('/oauth') === 0) {
             const oauthInfo = currentAudit.extra_info.split(' ');
 
             switch (currentActionURL) {
-            case '/oauth/register':
+            case '/oauth/register': {
                 const clientIdField = oauthInfo[0].split('=');
 
                 if (clientIdField[0] === 'client_id') {
@@ -138,6 +145,7 @@ export default class AccessHistoryModal extends React.Component {
                 }
 
                 break;
+            }
             case '/oauth/allow':
                 if (oauthInfo[0] === 'attempt') {
                     currentAuditDesc = 'Attempted to allow a new OAuth service access';
@@ -198,7 +206,7 @@ export default class AccessHistoryModal extends React.Component {
                 }
 
                 break;
-            case '/users/update_roles':
+            case '/users/update_roles': {
                 const userRoles = userInfo[0].split('=')[1];
 
                 currentAuditDesc = 'Updated user role(s) to ';
@@ -209,7 +217,8 @@ export default class AccessHistoryModal extends React.Component {
                 }
 
                 break;
-            case '/users/update_active':
+            }
+            case '/users/update_active': {
                 const updateType = userInfo[0].split('=')[0];
                 const updateField = userInfo[0].split('=')[1];
 
@@ -236,6 +245,7 @@ export default class AccessHistoryModal extends React.Component {
                 }
 
                 break;
+            }
             case '/users/send_password_reset':
                 currentAuditDesc = 'Sent an email to ' + userInfo[0].split('=')[1] + ' to reset your password';
                 break;
@@ -406,5 +416,5 @@ export default class AccessHistoryModal extends React.Component {
 
 AccessHistoryModal.propTypes = {
     show: React.PropTypes.bool.isRequired,
-    onModalDismissed: React.PropTypes.func.isRequired
+    onHide: React.PropTypes.func.isRequired
 };

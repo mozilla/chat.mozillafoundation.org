@@ -1,16 +1,16 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const CustomThemeChooser = require('./custom_theme_chooser.jsx');
-const PremadeThemeChooser = require('./premade_theme_chooser.jsx');
+import CustomThemeChooser from './custom_theme_chooser.jsx';
+import PremadeThemeChooser from './premade_theme_chooser.jsx';
 
-const UserStore = require('../../stores/user_store.jsx');
+import UserStore from '../../stores/user_store.jsx';
 
-const AppDispatcher = require('../../dispatcher/app_dispatcher.jsx');
-const Client = require('../../utils/client.jsx');
-const Utils = require('../../utils/utils.jsx');
+import AppDispatcher from '../../dispatcher/app_dispatcher.jsx';
+import * as Client from '../../utils/client.jsx';
+import * as Utils from '../../utils/utils.jsx';
 
-const Constants = require('../../utils/constants.jsx');
+import Constants from '../../utils/constants.jsx';
 const ActionTypes = Constants.ActionTypes;
 
 export default class UserSettingsAppearance extends React.Component {
@@ -74,6 +74,10 @@ export default class UserSettingsAppearance extends React.Component {
 
         this.props.setEnforceFocus(true);
     }
+    scrollToTop() {
+        $('.ps-container.modal-body').scrollTop(0);
+        $('.ps-container.modal-body').perfectScrollbar('update');
+    }
     submitTheme(e) {
         e.preventDefault();
         var user = UserStore.getCurrentUser();
@@ -88,9 +92,7 @@ export default class UserSettingsAppearance extends React.Component {
 
                 this.props.setRequireConfirm(false);
                 this.originalTheme = Object.assign({}, this.state.theme);
-
-                $('.ps-container.modal-body').scrollTop(0);
-                $('.ps-container.modal-body').perfectScrollbar('update');
+                this.scrollToTop();
             },
             (err) => {
                 var state = this.getStateFromStores();
@@ -129,6 +131,7 @@ export default class UserSettingsAppearance extends React.Component {
         const state = this.getStateFromStores();
         state.serverError = null;
         this.setState(state);
+        this.scrollToTop();
 
         Utils.applyTheme(state.theme);
 

@@ -1,15 +1,15 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const MemberList = require('./member_list.jsx');
-const LoadingScreen = require('./loading_screen.jsx');
+import MemberList from './member_list.jsx';
+import LoadingScreen from './loading_screen.jsx';
 
-const UserStore = require('../stores/user_store.jsx');
-const ChannelStore = require('../stores/channel_store.jsx');
+import UserStore from '../stores/user_store.jsx';
+import ChannelStore from '../stores/channel_store.jsx';
 
-const Utils = require('../utils/utils.jsx');
-const Client = require('../utils/client.jsx');
-const AsyncClient = require('../utils/async_client.jsx');
+import * as Utils from '../utils/utils.jsx';
+import * as Client from '../utils/client.jsx';
+import * as AsyncClient from '../utils/async_client.jsx';
 
 const Modal = ReactBootstrap.Modal;
 
@@ -20,16 +20,44 @@ export default class ChannelInviteModal extends React.Component {
         this.onListenerChange = this.onListenerChange.bind(this);
         this.handleInvite = this.handleInvite.bind(this);
 
-        this.state = this.getStateFromStores();
+        // the state gets populated when the modal is shown
+        this.state = {};
+    }
+    shouldComponentUpdate(nextProps, nextState) {
+        if (!this.props.show && !nextProps.show) {
+            return false;
+        }
+
+        if (!Utils.areObjectsEqual(this.props, nextProps)) {
+            return true;
+        }
+
+        if (!Utils.areObjectsEqual(this.state, nextState)) {
+            return true;
+        }
+
+        return false;
     }
     getStateFromStores() {
-        function getId(user) {
-            return user.id;
-        }
-        var users = UserStore.getActiveOnlyProfiles();
-        var memberIds = ChannelStore.getCurrentExtraInfo().members.map(getId);
+        const users = UserStore.getActiveOnlyProfiles();
 
-        var loading = $.isEmptyObject(users);
+        if ($.isEmptyObject(users)) {
+            return {
+                loading: true
+            };
+        }
+
+        // make sure we have all members of this channel before rendering
+        const extraInfo = ChannelStore.getCurrentExtraInfo();
+        if (extraInfo.member_count !== extraInfo.members.length) {
+            AsyncClient.getChannelExtraInfo(this.props.channel.id, -1);
+
+            return {
+                loading: true
+            };
+        }
+
+        const memberIds = extraInfo.members.map((user) => user.id);
 
         var nonmembers = [];
         for (var id in users) {
@@ -42,21 +70,17 @@ export default class ChannelInviteModal extends React.Component {
             return a.username.localeCompare(b.username);
         });
 
-        var channelName = '';
-        if (ChannelStore.getCurrent()) {
-            channelName = ChannelStore.getCurrent().display_name;
-        }
-
         return {
             nonmembers,
-            memberIds,
-            channelName,
-            loading
+            loading: false
         };
     }
     onShow() {
         if ($(window).width() > 768) {
             $(ReactDOM.findDOMNode(this.refs.modalBody)).perfectScrollbar();
+            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 200);
+        } else {
+            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 150);
         }
     }
     componentDidUpdate(prevProps) {
@@ -83,29 +107,15 @@ export default class ChannelInviteModal extends React.Component {
         }
     }
     handleInvite(userId) {
-        // Make sure the user isn't already a member of the channel
-        if (this.state.memberIds.indexOf(userId) > -1) {
-            return;
-        }
-
         var data = {};
         data.user_id = userId;
 
-        Client.addChannelMember(ChannelStore.getCurrentId(), data,
+        Client.addChannelMember(
+            this.props.channel.id,
+            data,
             () => {
-                var nonmembers = this.state.nonmembers;
-                var memberIds = this.state.memberIds;
-
-                for (var i = 0; i < nonmembers.length; i++) {
-                    if (userId === nonmembers[i].id) {
-                        nonmembers[i].invited = true;
-                        memberIds.push(userId);
-                        break;
-                    }
-                }
-
-                this.setState({inviteError: null, memberIds, nonmembers});
-                AsyncClient.getChannelExtraInfo(true);
+                this.setState({inviteError: null});
+                AsyncClient.getChannelExtraInfo();
             },
             (err) => {
                 this.setState({inviteError: err.message});
@@ -113,11 +123,6 @@ export default class ChannelInviteModal extends React.Component {
         );
     }
     render() {
-        var maxHeight = 1000;
-        if (Utils.windowHeight() <= 1200) {
-            maxHeight = Utils.windowHeight() - 300;
-        }
-
         var inviteError = null;
         if (this.state.inviteError) {
             inviteError = (<label className='has-error control-label'>{this.state.inviteError}</label>);
@@ -146,14 +151,13 @@ export default class ChannelInviteModal extends React.Component {
             <Modal
                 dialogClassName='more-modal'
                 show={this.props.show}
-                onHide={this.props.onModalDismissed}
+                onHide={this.props.onHide}
             >
                 <Modal.Header closeButton={true}>
-                    <Modal.Title>{'Add New Members to '}<span className='name'>{this.state.channelName}</span></Modal.Title>
+                    <Modal.Title>{'Add New Members to '}<span className='name'>{this.props.channel.display_name}</span></Modal.Title>
                 </Modal.Header>
                 <Modal.Body
                     ref='modalBody'
-                    style={{maxHeight}}
                 >
                     {inviteError}
                     {content}
@@ -162,7 +166,7 @@ export default class ChannelInviteModal extends React.Component {
                     <button
                         type='button'
                         className='btn btn-default'
-                        onClick={this.props.onModalDismissed}
+                        onClick={this.props.onHide}
                     >
                         {'Close'}
                     </button>
@@ -174,5 +178,6 @@ export default class ChannelInviteModal extends React.Component {
 
 ChannelInviteModal.propTypes = {
     show: React.PropTypes.bool.isRequired,
-    onModalDismissed: React.PropTypes.func.isRequired
+    onHide: React.PropTypes.func.isRequired,
+    channel: React.PropTypes.object.isRequired
 };

@@ -1,8 +1,8 @@
 // See License.txt for license information.
 
-var BrowserStore = require('../stores/browser_store.jsx');
-var TeamStore = require('../stores/team_store.jsx');
-var ErrorStore = require('../stores/error_store.jsx');
+import BrowserStore from '../stores/browser_store.jsx';
+import TeamStore from '../stores/team_store.jsx';
+import ErrorStore from '../stores/error_store.jsx';
 
 export function track(category, action, label, property, value) {
     global.window.analytics.track(action, {category, label, property, value});
@@ -228,6 +228,40 @@ export function resetPassword(data, success, error) {
     track('api', 'api_users_reset_password');
 }
 
+export function switchToSSO(data, success, error) {
+    $.ajax({
+        url: '/api/v1/users/switch_to_sso',
+        dataType: 'json',
+        contentType: 'application/json',
+        type: 'POST',
+        data: JSON.stringify(data),
+        success,
+        error: function onError(xhr, status, err) {
+            var e = handleError('switchToSSO', xhr, status, err);
+            error(e);
+        }
+    });
+
+    track('api', 'api_users_switch_to_sso');
+}
+
+export function switchToEmail(data, success, error) {
+    $.ajax({
+        url: '/api/v1/users/switch_to_email',
+        dataType: 'json',
+        contentType: 'application/json',
+        type: 'POST',
+        data: JSON.stringify(data),
+        success,
+        error: function onError(xhr, status, err) {
+            var e = handleError('switchToEmail', xhr, status, err);
+            error(e);
+        }
+    });
+
+    track('api', 'api_users_switch_to_email');
+}
+
 export function logout() {
     track('api', 'api_users_logout');
     var currentTeamUrl = TeamStore.getCurrentTeamUrl();
@@ -243,15 +277,39 @@ export function loginByEmail(name, email, password, success, error) {
         dataType: 'json',
         contentType: 'application/json',
         type: 'POST',
-        data: JSON.stringify({name: name, email: email, password: password}),
+        data: JSON.stringify({name, email, password}),
         success: function onSuccess(data, textStatus, xhr) {
             track('api', 'api_users_login_success', data.team_id, 'email', data.email);
+            sessionStorage.removeItem(data.id + '_last_error');
+            BrowserStore.signalLogin();
             success(data, textStatus, xhr);
         },
         error: function onError(xhr, status, err) {
             track('api', 'api_users_login_fail', name, 'email', email);
 
             var e = handleError('loginByEmail', xhr, status, err);
+            error(e);
+        }
+    });
+}
+
+export function loginByLdap(teamName, id, password, success, error) {
+    $.ajax({
+        url: '/api/v1/users/login_ldap',
+        dataType: 'json',
+        contentType: 'application/json',
+        type: 'POST',
+        data: JSON.stringify({teamName, id, password}),
+        success: function onSuccess(data, textStatus, xhr) {
+            track('api', 'api_users_loginLdap_success', data.team_id, 'id', id);
+            sessionStorage.removeItem(data.id + '_last_error');
+            BrowserStore.signalLogin();
+            success(data, textStatus, xhr);
+        },
+        error: function onError(xhr, status, err) {
+            track('api', 'api_users_loginLdap_fail', teamName, 'id', id);
+
+            var e = handleError('loginByLdap', xhr, status, err);
             error(e);
         }
     });
@@ -590,7 +648,12 @@ export function updateChannel(channel, success, error) {
     track('api', 'api_channels_update');
 }
 
-export function updateChannelHeader(data, success, error) {
+export function updateChannelHeader(channelId, header, success, error) {
+    const data = {
+        channel_id: channelId,
+        channel_header: header
+    };
+
     $.ajax({
         url: '/api/v1/channels/update_header',
         dataType: 'json',
@@ -761,10 +824,17 @@ export function getChannelCounts(success, error) {
     });
 }
 
-export function getChannelExtraInfo(id, success, error) {
+export function getChannelExtraInfo(id, memberLimit, success, error) {
+    let url = '/api/v1/channels/' + id + '/extra_info';
+
+    if (memberLimit) {
+        url += '/' + memberLimit;
+    }
+
     $.ajax({
-        url: '/api/v1/channels/' + id + '/extra_info',
+        url,
         dataType: 'json',
+        contentType: 'application/json',
         type: 'GET',
         success,
         error: function onError(xhr, status, err) {
@@ -820,7 +890,37 @@ export function getPosts(channelId, since, success, error, complete) {
     });
 }
 
-export function getPost(channelId, postId, success, error) {
+export function getPostsBefore(channelId, post, offset, numPost, success, error, complete) {
+    $.ajax({
+        url: '/api/v1/channels/' + channelId + '/post/' + post + '/before/' + offset + '/' + numPost,
+        dataType: 'json',
+        type: 'GET',
+        ifModified: false,
+        success,
+        error: function onError(xhr, status, err) {
+            var e = handleError('getPostsBefore', xhr, status, err);
+            error(e);
+        },
+        complete: complete
+    });
+}
+
+export function getPostsAfter(channelId, post, offset, numPost, success, error, complete) {
+    $.ajax({
+        url: '/api/v1/channels/' + channelId + '/post/' + post + '/after/' + offset + '/' + numPost,
+        dataType: 'json',
+        type: 'GET',
+        ifModified: false,
+        success,
+        error: function onError(xhr, status, err) {
+            var e = handleError('getPostsAfter', xhr, status, err);
+            error(e);
+        },
+        complete: complete
+    });
+}
+
+export function getPost(channelId, postId, success, error, complete) {
     $.ajax({
         cache: false,
         url: '/api/v1/channels/' + channelId + '/post/' + postId,
@@ -831,7 +931,24 @@ export function getPost(channelId, postId, success, error) {
         error: function onError(xhr, status, err) {
             var e = handleError('getPost', xhr, status, err);
             error(e);
-        }
+        },
+        complete
+    });
+}
+
+export function getPostById(postId, success, error, complete) {
+    $.ajax({
+        cache: false,
+        url: '/api/v1/posts/' + postId,
+        dataType: 'json',
+        type: 'GET',
+        ifModified: false,
+        success,
+        error: function onError(xhr, status, err) {
+            var e = handleError('getPostById', xhr, status, err);
+            error(e);
+        },
+        complete
     });
 }
 
@@ -1003,7 +1120,9 @@ export function getFileInfo(filename, success, error) {
         dataType: 'json',
         contentType: 'application/json',
         type: 'GET',
-        success,
+        success: (data) => {
+            success(data);
+        },
         error: function onError(xhr, status, err) {
             var e = handleError('getFileInfo', xhr, status, err);
             error(e);
@@ -1272,4 +1391,39 @@ export function regenOutgoingHookToken(data, success, error) {
             error(e);
         }
     });
+}
+
+export function uploadLicenseFile(formData, success, error) {
+    $.ajax({
+        url: '/api/v1/license/add',
+        type: 'POST',
+        data: formData,
+        cache: false,
+        contentType: false,
+        processData: false,
+        success,
+        error: function onError(xhr, status, err) {
+            var e = handleError('uploadLicenseFile', xhr, status, err);
+            error(e);
+        }
+    });
+
+    track('api', 'api_license_upload');
+}
+
+export function removeLicenseFile(success, error) {
+    $.ajax({
+        url: '/api/v1/license/remove',
+        type: 'POST',
+        cache: false,
+        contentType: false,
+        processData: false,
+        success,
+        error: function onError(xhr, status, err) {
+            var e = handleError('removeLicenseFile', xhr, status, err);
+            error(e);
+        }
+    });
+
+    track('api', 'api_license_upload');
 }

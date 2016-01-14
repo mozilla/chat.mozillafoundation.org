@@ -4,12 +4,17 @@
 package api
 
 import (
-	l4g "code.google.com/p/log4go"
 	"fmt"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/gorilla/mux"
 	"github.com/mattermost/platform/model"
 	"net/http"
+	"strconv"
 	"strings"
+)
+
+const (
+	defaultExtraMemberLimit = 100
 )
 
 func InitChannel(r *mux.Router) {
@@ -27,6 +32,7 @@ func InitChannel(r *mux.Router) {
 	sr.Handle("/update_notify_props", ApiUserRequired(updateNotifyProps)).Methods("POST")
 	sr.Handle("/{id:[A-Za-z0-9]+}/", ApiUserRequiredActivity(getChannel, false)).Methods("GET")
 	sr.Handle("/{id:[A-Za-z0-9]+}/extra_info", ApiUserRequired(getChannelExtraInfo)).Methods("GET")
+	sr.Handle("/{id:[A-Za-z0-9]+}/extra_info/{member_limit:-?[0-9]+}", ApiUserRequired(getChannelExtraInfo)).Methods("GET")
 	sr.Handle("/{id:[A-Za-z0-9]+}/join", ApiUserRequired(join)).Methods("POST")
 	sr.Handle("/{id:[A-Za-z0-9]+}/leave", ApiUserRequired(leave)).Methods("POST")
 	sr.Handle("/{id:[A-Za-z0-9]+}/delete", ApiUserRequired(deleteChannel)).Methods("POST")
@@ -268,17 +274,49 @@ func updateChannelHeader(c *Context, w http.ResponseWriter, r *http.Request) {
 		if !c.HasPermissionsToTeam(channel.TeamId, "updateChannelHeader") {
 			return
 		}
-
+		oldChannelHeader := channel.Header
 		channel.Header = channelHeader
 
 		if ucresult := <-Srv.Store.Channel().Update(channel); ucresult.Err != nil {
 			c.Err = ucresult.Err
 			return
 		} else {
+			PostUpdateChannelHeaderMessageAndForget(c, channel.Id, oldChannelHeader, channelHeader)
 			c.LogAudit("name=" + channel.Name)
 			w.Write([]byte(channel.ToJson()))
 		}
 	}
+}
+
+func PostUpdateChannelHeaderMessageAndForget(c *Context, channelId string, oldChannelHeader, newChannelHeader string) {
+	go func() {
+		uc := Srv.Store.User().Get(c.Session.UserId)
+
+		if uresult := <-uc; uresult.Err != nil {
+			l4g.Error("Failed to retrieve user while trying to save update channel header message %v", uresult.Err)
+			return
+		} else {
+			user := uresult.Data.(*model.User)
+
+			var message string
+			if oldChannelHeader == "" {
+				message = fmt.Sprintf("%s updated the channel header to: %s", user.Username, newChannelHeader)
+			} else if newChannelHeader == "" {
+				message = fmt.Sprintf("%s removed the channel header (was: %s)", user.Username, oldChannelHeader)
+			} else {
+				message = fmt.Sprintf("%s updated the channel header from: %s to: %s", user.Username, oldChannelHeader, newChannelHeader)
+			}
+
+			post := &model.Post{
+				ChannelId: channelId,
+				Message:   message,
+				Type:      model.POST_HEADER_CHANGE,
+			}
+			if _, err := CreatePost(c, post, false); err != nil {
+				l4g.Error("Failed to post join/leave message %v", err)
+			}
+		}
+	}()
 }
 
 func updateChannelPurpose(c *Context, w http.ResponseWriter, r *http.Request) {
@@ -421,7 +459,7 @@ func JoinChannel(c *Context, channelId string, role string) {
 				c.Err = err
 				return
 			}
-			PostUserAddRemoveMessageAndForget(c, channel.Id, fmt.Sprintf(`User %v has joined this channel.`, user.Username))
+			PostUserAddRemoveMessageAndForget(c, channel.Id, fmt.Sprintf(`%v has joined the channel.`, user.Username))
 		} else {
 			c.Err = model.NewAppError("join", "You do not have the appropriate permissions", "")
 			c.Err.StatusCode = http.StatusForbidden
@@ -647,6 +685,15 @@ func updateLastViewedAt(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	Srv.Store.Channel().UpdateLastViewedAt(id, c.Session.UserId)
 
+	preference := model.Preference{
+		UserId:   c.Session.UserId,
+		Category: model.PREFERENCE_CATEGORY_LAST,
+		Name:     model.PREFERENCE_NAME_LAST_CHANNEL,
+		Value:    id,
+	}
+
+	Srv.Store.Preference().Save(&model.Preferences{preference})
+
 	message := model.NewMessage(c.Session.TeamId, id, c.Session.UserId, model.ACTION_CHANNEL_VIEWED)
 	message.Add("channel_id", id)
 
@@ -689,9 +736,18 @@ func getChannel(c *Context, w http.ResponseWriter, r *http.Request) {
 }
 
 func getChannelExtraInfo(c *Context, w http.ResponseWriter, r *http.Request) {
-
 	params := mux.Vars(r)
 	id := params["id"]
+
+	var memberLimit int
+	if memberLimitString, ok := params["member_limit"]; !ok {
+		memberLimit = defaultExtraMemberLimit
+	} else if memberLimitInt64, err := strconv.ParseInt(memberLimitString, 10, 0); err != nil {
+		c.Err = model.NewAppError("getChannelExtraInfo", "Failed to parse member limit", err.Error())
+		return
+	} else {
+		memberLimit = int(memberLimitInt64)
+	}
 
 	sc := Srv.Store.Channel().Get(id)
 	var channel *model.Channel
@@ -702,13 +758,13 @@ func getChannelExtraInfo(c *Context, w http.ResponseWriter, r *http.Request) {
 		channel = cresult.Data.(*model.Channel)
 	}
 
-	extraEtag := channel.ExtraEtag()
+	extraEtag := channel.ExtraEtag(memberLimit)
 	if HandleEtag(extraEtag, w, r) {
 		return
 	}
 
 	scm := Srv.Store.Channel().GetMember(id, c.Session.UserId)
-	ecm := Srv.Store.Channel().GetExtraMembers(id, 20)
+	ecm := Srv.Store.Channel().GetExtraMembers(id, memberLimit)
 	ccm := Srv.Store.Channel().GetMemberCount(id)
 
 	if cmresult := <-scm; cmresult.Err != nil {

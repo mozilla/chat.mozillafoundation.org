@@ -1,17 +1,21 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const TutorialIntroScreens = require('./tutorial/tutorial_intro_screens.jsx');
-const CreatePost = require('./create_post.jsx');
-const PostsViewContainer = require('./posts_view_container.jsx');
-const ChannelHeader = require('./channel_header.jsx');
-const Navbar = require('./navbar.jsx');
-const FileUploadOverlay = require('./file_upload_overlay.jsx');
+import TutorialIntroScreens from './tutorial/tutorial_intro_screens.jsx';
+import CreatePost from './create_post.jsx';
+import PostsViewContainer from './posts_view_container.jsx';
+import PostFocusView from './post_focus_view.jsx';
+import ChannelHeader from './channel_header.jsx';
+import Navbar from './navbar.jsx';
+import FileUploadOverlay from './file_upload_overlay.jsx';
 
-const PreferenceStore = require('../stores/preference_store.jsx');
-const UserStore = require('../stores/user_store.jsx');
+import PreferenceStore from '../stores/preference_store.jsx';
+import ChannelStore from '../stores/channel_store.jsx';
+import UserStore from '../stores/user_store.jsx';
 
-const Constants = require('../utils/constants.jsx');
+import * as Utils from '../utils/utils.jsx';
+
+import Constants from '../utils/constants.jsx';
 const TutorialSteps = Constants.TutorialSteps;
 const Preferences = Constants.Preferences;
 
@@ -20,26 +24,68 @@ export default class CenterPanel extends React.Component {
         super(props);
 
         this.onPreferenceChange = this.onPreferenceChange.bind(this);
+        this.onChannelChange = this.onChannelChange.bind(this);
 
-        const tutorialPref = PreferenceStore.getPreference(Preferences.TUTORIAL_STEP, UserStore.getCurrentId(), {value: '999'});
-        this.state = {showTutorialScreens: parseInt(tutorialPref.value, 10) === TutorialSteps.INTRO_SCREENS};
+        const tutorialStep = PreferenceStore.getInt(Preferences.TUTORIAL_STEP, UserStore.getCurrentId(), 999);
+        this.state = {
+            showTutorialScreens: tutorialStep === TutorialSteps.INTRO_SCREENS,
+            showPostFocus: ChannelStore.getPostMode() === ChannelStore.POST_MODE_FOCUS
+        };
     }
     componentDidMount() {
         PreferenceStore.addChangeListener(this.onPreferenceChange);
+        ChannelStore.addChangeListener(this.onChannelChange);
     }
     componentWillUnmount() {
         PreferenceStore.removeChangeListener(this.onPreferenceChange);
+        ChannelStore.removeChangeListener(this.onChannelChange);
     }
     onPreferenceChange() {
-        const tutorialPref = PreferenceStore.getPreference(Preferences.TUTORIAL_STEP, UserStore.getCurrentId(), {value: '999'});
-        this.setState({showTutorialScreens: parseInt(tutorialPref.value, 10) <= TutorialSteps.INTRO_SCREENS});
+        const tutorialStep = PreferenceStore.getInt(Preferences.TUTORIAL_STEP, UserStore.getCurrentId(), 999);
+        this.setState({showTutorialScreens: tutorialStep <= TutorialSteps.INTRO_SCREENS});
+    }
+    onChannelChange() {
+        this.setState({showPostFocus: ChannelStore.getPostMode() === ChannelStore.POST_MODE_FOCUS});
     }
     render() {
+        const channel = ChannelStore.getCurrent();
+        var handleClick = null;
         let postsContainer;
+        let createPost;
         if (this.state.showTutorialScreens) {
             postsContainer = <TutorialIntroScreens />;
+            createPost = null;
+        } else if (this.state.showPostFocus) {
+            postsContainer = <PostFocusView />;
+
+            handleClick = function clickHandler(e) {
+                e.preventDefault();
+                Utils.switchChannel(channel);
+            };
+
+            createPost = (
+                <div
+                    id='archive-link-home'
+                >
+                    <a
+                        href=''
+                        onClick={handleClick}
+                    >
+                        {'You are viewing the Archives. Click here to jump to recent messages. '}
+                        {<i className='fa fa-arrow-down'></i>}
+                    </a>
+                </div>
+            );
         } else {
             postsContainer = <PostsViewContainer />;
+            createPost = (
+                <div
+                    className='post-create__container'
+                    id='post-create'
+                >
+                    <CreatePost />
+                </div>
+            );
         }
 
         return (
@@ -62,12 +108,7 @@ export default class CenterPanel extends React.Component {
                             <ChannelHeader />
                         </div>
                         {postsContainer}
-                        <div
-                            className='post-create__container'
-                            id='post-create'
-                        >
-                            <CreatePost />
-                        </div>
+                        {createPost}
                     </div>
                 </div>
             </div>

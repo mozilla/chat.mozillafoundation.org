@@ -1,21 +1,21 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
-const Client = require('../utils/client.jsx');
-const AsyncClient = require('../utils/async_client.jsx');
-const SocketStore = require('../stores/socket_store.jsx');
-const ChannelStore = require('../stores/channel_store.jsx');
-const UserStore = require('../stores/user_store.jsx');
-const PostStore = require('../stores/post_store.jsx');
-const PreferenceStore = require('../stores/preference_store.jsx');
-const Textbox = require('./textbox.jsx');
-const MsgTyping = require('./msg_typing.jsx');
-const FileUpload = require('./file_upload.jsx');
-const FilePreview = require('./file_preview.jsx');
-const Utils = require('../utils/utils.jsx');
+import AppDispatcher from '../dispatcher/app_dispatcher.jsx';
+import * as Client from '../utils/client.jsx';
+import * as AsyncClient from '../utils/async_client.jsx';
+import SocketStore from '../stores/socket_store.jsx';
+import ChannelStore from '../stores/channel_store.jsx';
+import UserStore from '../stores/user_store.jsx';
+import PostStore from '../stores/post_store.jsx';
+import PreferenceStore from '../stores/preference_store.jsx';
+import Textbox from './textbox.jsx';
+import MsgTyping from './msg_typing.jsx';
+import FileUpload from './file_upload.jsx';
+import FilePreview from './file_preview.jsx';
+import * as Utils from '../utils/utils.jsx';
 
-const Constants = require('../utils/constants.jsx');
+import Constants from '../utils/constants.jsx';
 const ActionTypes = Constants.ActionTypes;
 const KeyCodes = Constants.KeyCodes;
 
@@ -32,9 +32,7 @@ export default class CreateComment extends React.Component {
         this.handleUploadStart = this.handleUploadStart.bind(this);
         this.handleFileUploadComplete = this.handleFileUploadComplete.bind(this);
         this.handleUploadError = this.handleUploadError.bind(this);
-        this.handleTextDrop = this.handleTextDrop.bind(this);
         this.removePreview = this.removePreview.bind(this);
-        this.handleSubmit = this.handleSubmit.bind(this);
         this.getFileCount = this.getFileCount.bind(this);
         this.handleResize = this.handleResize.bind(this);
         this.onPreferenceChange = this.onPreferenceChange.bind(this);
@@ -48,7 +46,7 @@ export default class CreateComment extends React.Component {
             previews: draft.previews,
             submitting: false,
             windowWidth: Utils.windowWidth(),
-            ctrlSend: PreferenceStore.getPreference(Constants.Preferences.CATEGORY_ADVANCED_SETTINGS, 'send_on_ctrl_enter', {value: 'false'}).value
+            ctrlSend: PreferenceStore.getBool(Constants.Preferences.CATEGORY_ADVANCED_SETTINGS, 'send_on_ctrl_enter')
         };
     }
     componentDidMount() {
@@ -61,7 +59,7 @@ export default class CreateComment extends React.Component {
     }
     onPreferenceChange() {
         this.setState({
-            ctrlSend: PreferenceStore.getPreference(Constants.Preferences.CATEGORY_ADVANCED_SETTINGS, 'send_on_ctrl_enter', {value: 'false'}).value
+            ctrlSend: PreferenceStore.getBool(Constants.Preferences.CATEGORY_ADVANCED_SETTINGS, 'send_on_ctrl_enter')
         });
     }
     handleResize() {
@@ -150,7 +148,7 @@ export default class CreateComment extends React.Component {
         this.setState({messageText: '', submitting: false, postError: null, previews: [], serverError: null});
     }
     commentMsgKeyPress(e) {
-        if (this.state.ctrlSend === 'true' && e.ctrlKey || this.state.ctrlSend === 'false') {
+        if (this.state.ctrlSend && e.ctrlKey || !this.state.ctrlSend) {
             if (e.which === KeyCodes.ENTER && !e.shiftKey && !e.altKey) {
                 e.preventDefault();
                 ReactDOM.findDOMNode(this.refs.textbox).blur();
@@ -174,7 +172,7 @@ export default class CreateComment extends React.Component {
         this.setState({messageText: messageText});
     }
     handleKeyDown(e) {
-        if (this.state.ctrlSend === 'true' && e.keyCode === KeyCodes.ENTER && e.ctrlKey === true) {
+        if (this.state.ctrlSend && e.keyCode === KeyCodes.ENTER && e.ctrlKey === true) {
             this.commentMsgKeyPress(e);
             return;
         }
@@ -194,7 +192,8 @@ export default class CreateComment extends React.Component {
                 title: 'Comment',
                 message: lastPost.message,
                 postId: lastPost.id,
-                channelId: lastPost.channel_id
+                channelId: lastPost.channel_id,
+                comments: PostStore.getCommentCount(lastPost)
             });
         }
     }
@@ -238,11 +237,6 @@ export default class CreateComment extends React.Component {
 
             this.setState({uploadsInProgress: draft.uploadsInProgress, serverError: err});
         }
-    }
-    handleTextDrop(text) {
-        const newText = this.state.messageText + text;
-        this.handleUserInput(newText);
-        Utils.setCaretPosition(ReactDOM.findDOMNode(this.refs.textbox.refs.message), newText.length);
     }
     removePreview(id) {
         let previews = this.state.previews;
@@ -334,6 +328,7 @@ export default class CreateComment extends React.Component {
                                 messageText={this.state.messageText}
                                 createMessage='Add a comment...'
                                 initialText=''
+                                supportsCommands={false}
                                 id='reply_textbox'
                                 ref='textbox'
                             />
@@ -343,7 +338,6 @@ export default class CreateComment extends React.Component {
                                 onUploadStart={this.handleUploadStart}
                                 onFileUpload={this.handleFileUploadComplete}
                                 onUploadError={this.handleUploadError}
-                                onTextDrop={this.handleTextDrop}
                                 postType='comment'
                                 channelId={this.props.channelId}
                             />
@@ -361,11 +355,11 @@ export default class CreateComment extends React.Component {
                             onClick={this.handleSubmit}
                         />
                         {uploadsInProgressText}
+                        {preview}
                         {postError}
                         {serverError}
                     </div>
                 </div>
-                {preview}
             </form>
         );
     }

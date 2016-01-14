@@ -4,7 +4,7 @@
 package store
 
 import (
-	l4g "code.google.com/p/log4go"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/mattermost/platform/model"
 )
 
@@ -149,6 +149,24 @@ func (me SqlSessionStore) RemoveAllSessionsForTeam(teamId string) StoreChannel {
 		_, err := me.GetMaster().Exec("DELETE FROM Sessions WHERE TeamId = :TeamId", map[string]interface{}{"TeamId": teamId})
 		if err != nil {
 			result.Err = model.NewAppError("SqlSessionStore.RemoveAllSessionsForTeam", "We couldn't remove all the sessions for the team", "id="+teamId+", err="+err.Error())
+		}
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (me SqlSessionStore) PermanentDeleteSessionsByUser(userId string) StoreChannel {
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		_, err := me.GetMaster().Exec("DELETE FROM Sessions WHERE UserId = :UserId", map[string]interface{}{"UserId": userId})
+		if err != nil {
+			result.Err = model.NewAppError("SqlSessionStore.RemoveAllSessionsForUser", "We couldn't remove all the sessions for the user", "id="+userId+", err="+err.Error())
 		}
 
 		storeChannel <- result

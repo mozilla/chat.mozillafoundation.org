@@ -1,12 +1,12 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const UserStore = require('../stores/user_store.jsx');
-const Client = require('../utils/client.jsx');
-const AsyncClient = require('../utils/async_client.jsx');
+import UserStore from '../stores/user_store.jsx';
+import * as Client from '../utils/client.jsx';
+import * as AsyncClient from '../utils/async_client.jsx';
 const Modal = ReactBootstrap.Modal;
-const LoadingScreen = require('./loading_screen.jsx');
-const Utils = require('../utils/utils.jsx');
+import LoadingScreen from './loading_screen.jsx';
+import * as Utils from '../utils/utils.jsx';
 
 export default class ActivityLogModal extends React.Component {
     constructor(props) {
@@ -51,17 +51,23 @@ export default class ActivityLogModal extends React.Component {
     onShow() {
         AsyncClient.getSessions();
 
-        $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 300);
         if ($(window).width() > 768) {
             $(ReactDOM.findDOMNode(this.refs.modalBody)).perfectScrollbar();
+            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 200);
+        } else {
+            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 150);
         }
     }
     onHide() {
         this.setState({moreInfo: []});
-        this.props.onModalDismissed();
+        this.props.onHide();
     }
     componentDidMount() {
         UserStore.addSessionsChangeListener(this.onListenerChange);
+
+        if (this.props.show) {
+            this.onShow();
+        }
     }
     componentDidUpdate(prevProps) {
         if (this.props.show && !prevProps.show) {
@@ -178,5 +184,5 @@ export default class ActivityLogModal extends React.Component {
 
 ActivityLogModal.propTypes = {
     show: React.PropTypes.bool.isRequired,
-    onModalDismissed: React.PropTypes.func.isRequired
+    onHide: React.PropTypes.func.isRequired
 };

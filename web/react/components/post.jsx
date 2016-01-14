@@ -1,19 +1,17 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var PostHeader = require('./post_header.jsx');
-var PostBody = require('./post_body.jsx');
-var AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
-var Constants = require('../utils/constants.jsx');
-var UserStore = require('../stores/user_store.jsx');
-var PostStore = require('../stores/post_store.jsx');
-var ChannelStore = require('../stores/channel_store.jsx');
-var client = require('../utils/client.jsx');
-var AsyncClient = require('../utils/async_client.jsx');
+import PostHeader from './post_header.jsx';
+import PostBody from './post_body.jsx';
+import AppDispatcher from '../dispatcher/app_dispatcher.jsx';
+import Constants from '../utils/constants.jsx';
+import UserStore from '../stores/user_store.jsx';
+import PostStore from '../stores/post_store.jsx';
+import ChannelStore from '../stores/channel_store.jsx';
+import * as client from '../utils/client.jsx';
+import * as AsyncClient from '../utils/async_client.jsx';
 var ActionTypes = Constants.ActionTypes;
-var utils = require('../utils/utils.jsx');
-
-var PostInfo = require('./post_info.jsx');
+import * as utils from '../utils/utils.jsx';
 
 export default class Post extends React.Component {
     constructor(props) {
@@ -89,7 +87,15 @@ export default class Post extends React.Component {
             return true;
         }
 
+        if (nextProps.displayNameType !== this.props.displayNameType) {
+            return true;
+        }
+
         if (this.getCommentCount(nextProps) !== this.getCommentCount(this.props)) {
+            return true;
+        }
+
+        if (nextProps.shouldHighlight !== this.props.shouldHighlight) {
             return true;
         }
 
@@ -107,7 +113,7 @@ export default class Post extends React.Component {
         } else {
             commentRootId = post.id;
         }
-        for (let postId in posts) {
+        for (const postId in posts) {
             if (posts[postId].root_id === commentRootId) {
                 commentCount += 1;
             }
@@ -116,68 +122,79 @@ export default class Post extends React.Component {
         return commentCount;
     }
     render() {
-        var post = this.props.post;
-        var parentPost = this.props.parentPost;
-        var posts = this.props.posts;
+        const post = this.props.post;
+        const parentPost = this.props.parentPost;
+        const posts = this.props.posts;
 
         if (!post.props) {
             post.props = {};
         }
 
-        var type = 'Post';
+        let type = 'Post';
         if (post.root_id && post.root_id.length > 0) {
             type = 'Comment';
         }
 
         const commentCount = this.getCommentCount(this.props);
 
-        var rootUser;
+        let rootUser;
         if (this.props.sameRoot) {
             rootUser = 'same--root';
         } else {
             rootUser = 'other--root';
         }
 
-        var postType = '';
+        let postType = '';
         if (type !== 'Post') {
             postType = 'post--comment';
+        } else if (commentCount > 0) {
+            postType = 'post--root';
         }
 
-        var currentUserCss = '';
-        if (UserStore.getCurrentId() === post.user_id && !post.props.from_webhook) {
+        let currentUserCss = '';
+        if (UserStore.getCurrentId() === post.user_id && !post.props.from_webhook && !utils.isSystemMessage(post)) {
             currentUserCss = 'current--user';
         }
 
-        var userProfile = UserStore.getProfile(post.user_id);
+        const userProfile = UserStore.getProfile(post.user_id);
 
-        var timestamp = UserStore.getCurrentUser().update_at;
+        let timestamp = UserStore.getCurrentUser().update_at;
         if (userProfile) {
             timestamp = userProfile.update_at;
         }
 
-        var sameUserClass = '';
+        let sameUserClass = '';
         if (this.props.sameUser) {
             sameUserClass = 'same--user';
         }
 
-        var profilePic = null;
+        let shouldHighlightClass = '';
+        if (this.props.shouldHighlight) {
+            shouldHighlightClass = 'post--highlight';
+        }
+
+        let systemMessageClass = '';
+        if (utils.isSystemMessage(post)) {
+            systemMessageClass = 'post--system';
+        }
+
+        let profilePic = null;
         if (!this.props.hideProfilePic) {
             let src = '/api/v1/users/' + post.user_id + '/image?time=' + timestamp + '&' + utils.getSessionIndex();
             if (post.props && post.props.from_webhook && global.window.mm_config.EnablePostIconOverride === 'true') {
                 if (post.props.override_icon_url) {
                     src = post.props.override_icon_url;
                 }
+            } else if (utils.isSystemMessage(post)) {
+                src = Constants.SYSTEM_MESSAGE_PROFILE_IMAGE;
             }
 
             profilePic = (
-                <div className='post-profile-img__container'>
-                    <img
-                        className='post-profile-img'
-                        src={src}
-                        height='36'
-                        width='36'
-                    />
-                </div>
+                <img
+                    src={src}
+                    height='36'
+                    width='36'
+                />
             );
         }
 
@@ -185,34 +202,28 @@ export default class Post extends React.Component {
             <div>
                 <div
                     id={'post_' + post.id}
-                    className={'post ' + sameUserClass + ' ' + rootUser + ' ' + postType + ' ' + currentUserCss}
+                    className={'post ' + sameUserClass + ' ' + rootUser + ' ' + postType + ' ' + currentUserCss + ' ' + shouldHighlightClass + ' ' + systemMessageClass}
                 >
-                    {profilePic}
                     <div className='post__content'>
-                        <PostHeader
-                            ref='header'
-                            post={post}
-                            sameRoot={this.props.sameRoot}
-                            commentCount={commentCount}
-                            handleCommentClick={this.handleCommentClick}
-                            isLastComment={this.props.isLastComment}
-                        />
-                        <PostBody
-                            post={post}
-                            sameRoot={this.props.sameRoot}
-                            parentPost={parentPost}
-                            posts={posts}
-                            handleCommentClick={this.handleCommentClick}
-                            retryPost={this.retryPost}
-                        />
-                        <PostInfo
-                            ref='info'
-                            post={post}
-                            sameRoot={this.props.sameRoot}
-                            commentCount={commentCount}
-                            handleCommentClick={this.handleCommentClick}
-                            allowReply='true'
-                        />
+                        <div className='post__img'>{profilePic}</div>
+                        <div>
+                            <PostHeader
+                                ref='header'
+                                post={post}
+                                sameRoot={this.props.sameRoot}
+                                commentCount={commentCount}
+                                handleCommentClick={this.handleCommentClick}
+                                isLastComment={this.props.isLastComment}
+                            />
+                            <PostBody
+                                post={post}
+                                sameRoot={this.props.sameRoot}
+                                parentPost={parentPost}
+                                posts={posts}
+                                handleCommentClick={this.handleCommentClick}
+                                retryPost={this.retryPost}
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
@@ -227,5 +238,7 @@ Post.propTypes = {
     sameUser: React.PropTypes.bool,
     sameRoot: React.PropTypes.bool,
     hideProfilePic: React.PropTypes.bool,
-    isLastComment: React.PropTypes.bool
+    isLastComment: React.PropTypes.bool,
+    shouldHighlight: React.PropTypes.bool,
+    displayNameType: React.PropTypes.string
 };

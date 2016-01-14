@@ -1,12 +1,12 @@
-// Copyright (c) 2015 Spinpunch, Inc. All Rights Reserved.
+// Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const LoadingScreen = require('../loading_screen.jsx');
+import LoadingScreen from '../loading_screen.jsx';
 
-const ChannelStore = require('../../stores/channel_store.jsx');
+import ChannelStore from '../../stores/channel_store.jsx';
 
-const Client = require('../../utils/client.jsx');
-const Constants = require('../../utils/constants.jsx');
+import * as Client from '../../utils/client.jsx';
+import Constants from '../../utils/constants.jsx';
 
 export default class ManageOutgoingHooks extends React.Component {
     constructor() {
@@ -36,7 +36,7 @@ export default class ManageOutgoingHooks extends React.Component {
         if (this.state.triggerWords.length !== 0) {
             hook.trigger_words = this.state.triggerWords.trim().split(',');
         }
-        hook.callback_urls = this.state.callbackURLs.split('\n');
+        hook.callback_urls = this.state.callbackURLs.split('\n').map((url) => url.trim());
 
         Client.addOutgoingHook(
             hook,
@@ -188,7 +188,7 @@ export default class ManageOutgoingHooks extends React.Component {
                     key={hook.id}
                     className='webhook__item'
                 >
-                    <div className='padding-top x2'>
+                    <div className='padding-top x2 webhook__url'>
                         <strong>{'URLs: '}</strong><span className='word-break--all'>{hook.callback_urls.join(', ')}</span>
                     </div>
                     {channelDiv}
@@ -240,7 +240,14 @@ export default class ManageOutgoingHooks extends React.Component {
 
         return (
             <div key='addOutgoingHook'>
-                {'Create webhooks to send new message events to an external integration. Please see '}<a href='http://mattermost.org/webhooks'>{'http://mattermost.org/webhooks'}</a> {' to learn more.'}
+                {'Create webhooks to send new message events to an external integration. Please see '}
+                <a
+                    href='http://mattermost.org/webhooks'
+                    target='_blank'
+                >
+                    {'http://mattermost.org/webhooks'}
+                </a>
+                {' to learn more.'}
                 <div><label className='control-label padding-top x2'>{'Add a new outgoing webhook'}</label></div>
                 <div className='padding-top divider-light'></div>
                 <div className='padding-top'>

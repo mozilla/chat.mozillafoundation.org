@@ -1,3 +1,5 @@
+@charset "UTF-8";
+
 /* Welcome to Compass.
  * In this file you should write your main styles. (or centralize your imports)
  * Import this file using the following HTML or equivalent:
@@ -32,7 +34,6 @@
 @import "partials/modal";
 @import "partials/forms";
 @import "partials/mentions";
-@import "partials/command-box";
 @import "partials/error";
 @import "partials/error-bar";
 @import "partials/loading";
@@ -40,9 +41,19 @@
 @import "partials/markdown";
 @import "partials/tutorial";
 @import "partials/statistics";
+@import "partials/suggestion_list";
+
+// Elements
+@import "partials/tooltips";
 
 // Responsive Css
 @import "partials/responsive";
 
+// Docs Css
+@import "partials/docs";
+
 // Standalone Css
 @import "partials/oauth";
+
+// Print
+@import "partials/print";

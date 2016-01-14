@@ -2,8 +2,8 @@
 // See License.txt for license information.
 
 const Modal = ReactBootstrap.Modal;
-const UserStore = require('../stores/user_store.jsx');
-const Utils = require('../utils/utils.jsx');
+import UserStore from '../stores/user_store.jsx';
+import * as Utils from '../utils/utils.jsx';
 
 export default class MoreDirectChannels extends React.Component {
     constructor(props) {
@@ -45,6 +45,21 @@ export default class MoreDirectChannels extends React.Component {
 
     componentWillUnmount() {
         UserStore.addChangeListener(this.handleUserChange);
+    }
+
+    componentDidUpdate(prevProps) {
+        if (!prevProps.show && this.props.show) {
+            this.onShow();
+        }
+    }
+
+    onShow() {
+        if (Utils.isMobile()) {
+            $(ReactDOM.findDOMNode(this.refs.userList)).css('max-height', $(window).height() - 250);
+        } else {
+            $(ReactDOM.findDOMNode(this.refs.userList)).perfectScrollbar();
+            $(ReactDOM.findDOMNode(this.refs.userList)).css('max-height', $(window).height() - 300);
+        }
     }
 
     handleFilterChange() {
@@ -164,15 +179,6 @@ export default class MoreDirectChannels extends React.Component {
         );
     }
 
-    componentDidUpdate(prevProps) {
-        if (!prevProps.show && this.props.show) {
-            $(ReactDOM.findDOMNode(this.refs.userList)).css('max-height', $(window).height() - 300);
-            if ($(window).width() > 768) {
-                $(ReactDOM.findDOMNode(this.refs.userList)).perfectScrollbar();
-            }
-        }
-    }
-
     render() {
         if (!this.props.show) {
             return null;
@@ -217,8 +223,8 @@ export default class MoreDirectChannels extends React.Component {
                 <Modal.Header closeButton={true}>
                     <Modal.Title>{'Direct Messages'}</Modal.Title>
                 </Modal.Header>
-                <Modal.Body>
-                    <div className='row filter-row'>
+                <Modal.Body ref='modalBody'>
+                    <div className='filter-row'>
                         <div className='col-sm-6'>
                             <input
                                 ref='filter'

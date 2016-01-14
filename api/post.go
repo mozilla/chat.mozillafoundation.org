@@ -4,8 +4,8 @@
 package api
 
 import (
-	l4g "code.google.com/p/log4go"
 	"fmt"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/gorilla/mux"
 	"github.com/mattermost/platform/model"
 	"github.com/mattermost/platform/store"
@@ -23,6 +23,7 @@ func InitPost(r *mux.Router) {
 	l4g.Debug("Initializing post api routes")
 
 	r.Handle("/posts/search", ApiUserRequired(searchPosts)).Methods("GET")
+	r.Handle("/posts/{post_id}", ApiUserRequired(getPostById)).Methods("GET")
 
 	sr := r.PathPrefix("/channels/{id:[A-Za-z0-9]+}").Subrouter()
 	sr.Handle("/create", ApiUserRequired(createPost)).Methods("POST")
@@ -152,9 +153,6 @@ func CreateWebhookPost(c *Context, channelId, text, overrideUsername, overrideIc
 	linkWithTextRegex := regexp.MustCompile(`<([^<\|]+)\|([^>]+)>`)
 	text = linkWithTextRegex.ReplaceAllString(text, "[${2}](${1})")
 
-	linkRegex := regexp.MustCompile(`<\s*(\S*)\s*>`)
-	text = linkRegex.ReplaceAllString(text, "${1}")
-
 	post := &model.Post{UserId: c.Session.UserId, ChannelId: channelId, Message: text, Type: postType}
 	post.AddProp("from_webhook", "true")
 
@@ -176,7 +174,21 @@ func CreateWebhookPost(c *Context, channelId, text, overrideUsername, overrideIc
 
 	if len(props) > 0 {
 		for key, val := range props {
-			if key != "override_icon_url" && key != "override_username" && key != "from_webhook" {
+			if key == "attachments" {
+				if list, success := val.([]interface{}); success {
+					// parse attachment links into Markdown format
+					for i, aInt := range list {
+						attachment := aInt.(map[string]interface{})
+						if _, ok := attachment["text"]; ok {
+							aText := attachment["text"].(string)
+							aText = linkWithTextRegex.ReplaceAllString(aText, "[${2}](${1})")
+							attachment["text"] = aText
+							list[i] = attachment
+						}
+					}
+					post.AddProp(key, list)
+				}
+			} else if key != "override_icon_url" && key != "override_username" && key != "from_webhook" {
 				post.AddProp(key, val)
 			}
 		}
@@ -224,7 +236,66 @@ func handlePostEventsAndForget(c *Context, post *model.Post, triggerWebhooks boo
 		if triggerWebhooks {
 			handleWebhookEventsAndForget(c, post, team, channel, user)
 		}
+
+		if channel.Type == model.CHANNEL_DIRECT {
+			go makeDirectChannelVisible(c.Session.TeamId, post.ChannelId)
+		}
 	}()
+}
+
+func makeDirectChannelVisible(teamId string, channelId string) {
+	var members []model.ChannelMember
+	if result := <-Srv.Store.Channel().GetMembers(channelId); result.Err != nil {
+		l4g.Error("Failed to get channel members channel_id=%v err=%v", channelId, result.Err.Message)
+		return
+	} else {
+		members = result.Data.([]model.ChannelMember)
+	}
+
+	if len(members) != 2 {
+		l4g.Error("Failed to get 2 members for a direct channel channel_id=%v", channelId)
+		return
+	}
+
+	// make sure the channel is visible to both members
+	for i, member := range members {
+		otherUserId := members[1-i].UserId
+
+		if result := <-Srv.Store.Preference().Get(member.UserId, model.PREFERENCE_CATEGORY_DIRECT_CHANNEL_SHOW, otherUserId); result.Err != nil {
+			// create a new preference since one doesn't exist yet
+			preference := &model.Preference{
+				UserId:   member.UserId,
+				Category: model.PREFERENCE_CATEGORY_DIRECT_CHANNEL_SHOW,
+				Name:     otherUserId,
+				Value:    "true",
+			}
+
+			if saveResult := <-Srv.Store.Preference().Save(&model.Preferences{*preference}); saveResult.Err != nil {
+				l4g.Error("Failed to save direct channel preference user_id=%v other_user_id=%v err=%v", member.UserId, otherUserId, saveResult.Err.Message)
+			} else {
+				message := model.NewMessage(teamId, channelId, member.UserId, model.ACTION_PREFERENCE_CHANGED)
+				message.Add("preference", preference.ToJson())
+
+				PublishAndForget(message)
+			}
+		} else {
+			preference := result.Data.(model.Preference)
+
+			if preference.Value != "true" {
+				// update the existing preference to make the channel visible
+				preference.Value = "true"
+
+				if updateResult := <-Srv.Store.Preference().Save(&model.Preferences{preference}); updateResult.Err != nil {
+					l4g.Error("Failed to update direct channel preference user_id=%v other_user_id=%v err=%v", member.UserId, otherUserId, updateResult.Err.Message)
+				} else {
+					message := model.NewMessage(teamId, channelId, member.UserId, model.ACTION_PREFERENCE_CHANGED)
+					message.Add("preference", preference.ToJson())
+
+					PublishAndForget(message)
+				}
+			}
+		}
+	}
 }
 
 func handleWebhookEventsAndForget(c *Context, post *model.Post, team *model.Team, channel *model.Channel, user *model.User) {
@@ -406,9 +477,9 @@ func sendNotificationsAndForget(c *Context, post *model.Post, team *model.Team, 
 					}
 
 					// Add @all to keywords if user has them turned on
-					if profile.NotifyProps["all"] == "true" {
-						keywordMap["@all"] = append(keywordMap["@all"], profile.Id)
-					}
+					// if profile.NotifyProps["all"] == "true" {
+					// 	keywordMap["@all"] = append(keywordMap["@all"], profile.Id)
+					// }
 
 					// Add @channel to keywords if user has them turned on
 					if profile.NotifyProps["channel"] == "true" {
@@ -420,33 +491,50 @@ func sendNotificationsAndForget(c *Context, post *model.Post, team *model.Team, 
 				splitF := func(c rune) bool {
 					return model.SplitRunes[c]
 				}
-				splitMessage := strings.FieldsFunc(post.Message, splitF)
+				splitMessage := strings.Fields(post.Message)
 				for _, word := range splitMessage {
+					var userIds []string
 
 					// Non-case-sensitive check for regular keys
-					userIds1, keyMatch := keywordMap[strings.ToLower(word)]
+					if ids, match := keywordMap[strings.ToLower(word)]; match {
+						userIds = append(userIds, ids...)
+					}
 
 					// Case-sensitive check for first name
-					userIds2, firstNameMatch := keywordMap[word]
+					if ids, match := keywordMap[word]; match {
+						userIds = append(userIds, ids...)
+					}
 
-					userIds := append(userIds1, userIds2...)
+					if len(userIds) == 0 {
+						// No matches were found with the string split just on whitespace so try further splitting
+						// the message on punctuation
+						splitWords := strings.FieldsFunc(word, splitF)
 
-					// If one of the non-case-senstive keys or the first name matches the word
-					//  then we add en entry to the sendEmail map
-					if keyMatch || firstNameMatch {
-						for _, userId := range userIds {
-							if post.UserId == userId {
-								continue
+						for _, splitWord := range splitWords {
+							// Non-case-sensitive check for regular keys
+							if ids, match := keywordMap[strings.ToLower(splitWord)]; match {
+								userIds = append(userIds, ids...)
 							}
-							sendEmail := true
-							if _, ok := profileMap[userId].NotifyProps["email"]; ok && profileMap[userId].NotifyProps["email"] == "false" {
-								sendEmail = false
+
+							// Case-sensitive check for first name
+							if ids, match := keywordMap[splitWord]; match {
+								userIds = append(userIds, ids...)
 							}
-							if sendEmail && (profileMap[userId].IsAway() || profileMap[userId].IsOffline()) {
-								toEmailMap[userId] = true
-							} else {
-								toEmailMap[userId] = false
-							}
+						}
+					}
+
+					for _, userId := range userIds {
+						if post.UserId == userId {
+							continue
+						}
+						sendEmail := true
+						if _, ok := profileMap[userId].NotifyProps["email"]; ok && profileMap[userId].NotifyProps["email"] == "false" {
+							sendEmail = false
+						}
+						if sendEmail && (profileMap[userId].IsAway() || profileMap[userId].IsOffline()) {
+							toEmailMap[userId] = true
+						} else {
+							toEmailMap[userId] = false
 						}
 					}
 				}
@@ -465,8 +553,7 @@ func sendNotificationsAndForget(c *Context, post *model.Post, team *model.Team, 
 				teamURL := c.GetSiteURL() + "/" + team.Name
 
 				// Build and send the emails
-				location, _ := time.LoadLocation("UTC")
-				tm := time.Unix(post.CreateAt/1000, 0).In(location)
+				tm := time.Unix(post.CreateAt/1000, 0)
 
 				subjectPage := NewServerTemplatePage("post_subject")
 				subjectPage.Props["SiteURL"] = c.GetSiteURL()
@@ -498,6 +585,7 @@ func sendNotificationsAndForget(c *Context, post *model.Post, team *model.Team, 
 					bodyPage.Props["Minute"] = fmt.Sprintf("%02d", tm.Minute())
 					bodyPage.Props["Month"] = tm.Month().String()[:3]
 					bodyPage.Props["Day"] = fmt.Sprintf("%d", tm.Day())
+					bodyPage.Props["TimeZone"], _ = tm.Zone()
 					bodyPage.Props["PostMessage"] = model.ClearMentionTags(post.Message)
 					bodyPage.Props["TeamLink"] = teamURL + "/channels/" + channel.Name
 
@@ -535,7 +623,7 @@ func sendNotificationsAndForget(c *Context, post *model.Post, team *model.Team, 
 						l4g.Error("Failed to send mention email successfully email=%v err=%v", profileMap[id].Email, err)
 					}
 
-					if len(utils.Cfg.EmailSettings.ApplePushServer) > 0 {
+					if *utils.Cfg.EmailSettings.SendPushNotifications {
 						sessionChan := Srv.Store.Session().GetSessions(id)
 						if result := <-sessionChan; result.Err != nil {
 							l4g.Error("Failed to retrieve sessions in notifications id=%v, err=%v", id, result.Err)
@@ -544,10 +632,35 @@ func sendNotificationsAndForget(c *Context, post *model.Post, team *model.Team, 
 							alreadySeen := make(map[string]string)
 
 							for _, session := range sessions {
-								if len(session.DeviceId) > 0 && alreadySeen[session.DeviceId] == "" && strings.HasPrefix(session.DeviceId, "apple:") {
+								if len(session.DeviceId) > 0 && alreadySeen[session.DeviceId] == "" &&
+									(strings.HasPrefix(session.DeviceId, model.PUSH_NOTIFY_APPLE+":") || strings.HasPrefix(session.DeviceId, model.PUSH_NOTIFY_ANDROID+":")) {
 									alreadySeen[session.DeviceId] = session.DeviceId
 
-									utils.SendAppleNotifyAndForget(strings.TrimPrefix(session.DeviceId, "apple:"), subjectPage.Render(), 1)
+									msg := model.PushNotification{}
+									msg.Badge = 1
+									msg.ServerId = utils.CfgDiagnosticId
+
+									if strings.HasPrefix(session.DeviceId, model.PUSH_NOTIFY_APPLE+":") {
+										msg.Platform = model.PUSH_NOTIFY_APPLE
+										msg.DeviceId = strings.TrimPrefix(session.DeviceId, model.PUSH_NOTIFY_APPLE+":")
+									} else if strings.HasPrefix(session.DeviceId, model.PUSH_NOTIFY_ANDROID+":") {
+										msg.Platform = model.PUSH_NOTIFY_ANDROID
+										msg.DeviceId = strings.TrimPrefix(session.DeviceId, model.PUSH_NOTIFY_ANDROID+":")
+									}
+
+									if channel.Type == model.CHANNEL_DIRECT {
+										msg.Message = senderName + " sent you a direct message"
+									} else {
+										msg.Message = senderName + " mentioned you in " + channelName
+									}
+
+									httpClient := http.Client{}
+									request, _ := http.NewRequest("POST", *utils.Cfg.EmailSettings.PushNotificationServer+"/api/v1/send_push", strings.NewReader(msg.ToJson()))
+
+									l4g.Debug("Sending push notification to " + msg.DeviceId + " with msg of '" + msg.Message + "'")
+									if _, err := httpClient.Do(request); err != nil {
+										l4g.Error("Failed to send push notificationid=%v, err=%v", id, err)
+									}
 								}
 							}
 						}
@@ -767,6 +880,41 @@ func getPost(c *Context, w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func getPostById(c *Context, w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+
+	postId := params["post_id"]
+	if len(postId) != 26 {
+		c.SetInvalidParam("getPostById", "postId")
+		return
+	}
+
+	if result := <-Srv.Store.Post().Get(postId); result.Err != nil {
+		c.Err = result.Err
+		return
+	} else {
+		list := result.Data.(*model.PostList)
+
+		if len(list.Order) != 1 {
+			c.Err = model.NewAppError("getPostById", "Unable to get post", "")
+			return
+		}
+		post := list.Posts[list.Order[0]]
+
+		cchan := Srv.Store.Channel().CheckPermissionsTo(c.Session.TeamId, post.ChannelId, c.Session.UserId)
+		if !c.HasPermissionsToChannel(cchan, "getPostById") {
+			return
+		}
+
+		if HandleEtag(list.Etag(), w, r) {
+			return
+		}
+
+		w.Header().Set(model.HEADER_ETAG_SERVER, list.Etag())
+		w.Write([]byte(list.ToJson()))
+	}
+}
+
 func deletePost(c *Context, w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 
@@ -922,5 +1070,7 @@ func searchPosts(c *Context, w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+	w.Header().Set("Expires", "0")
 	w.Write([]byte(posts.ToJson()))
 }

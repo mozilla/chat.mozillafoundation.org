@@ -1,8 +1,8 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var Client = require('../../utils/client.jsx');
-var AsyncClient = require('../../utils/async_client.jsx');
+import * as Client from '../../utils/client.jsx';
+import * as AsyncClient from '../../utils/async_client.jsx';
 
 export default class RateSettings extends React.Component {
     constructor(props) {
@@ -241,7 +241,7 @@ export default class RateSettings extends React.Component {
                                 onChange={this.handleChange}
                                 disabled={!this.state.EnableRateLimiter || this.state.VaryByRemoteAddr}
                             />
-                            <p className='help-text'>{'When filled in, vary rate limiting by HTTP header field specified (e.g. when configuring Ngnix set to "X-Real-IP", when configuring AmazonELB set to "X-Forwarded-For").'}</p>
+                            <p className='help-text'>{'When filled in, vary rate limiting by HTTP header field specified (e.g. when configuring NGINX set to "X-Real-IP", when configuring AmazonELB set to "X-Forwarded-For").'}</p>
                         </div>
                     </div>
 

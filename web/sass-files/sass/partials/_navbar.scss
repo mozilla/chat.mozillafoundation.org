@@ -1,3 +1,5 @@
+@charset "UTF-8";
+
 #navbar{
 	input {
 		margin: 0px 5px 0px 2px;
@@ -32,6 +34,12 @@
 			.icon-bar {
 				background: #fff;
 				width: 21px;
+			}
+			.glyphicon-search {
+				top: -1px;
+			}
+			.icon--white {
+				color: #fff;
 			}
 			&:hover, &:active, &:focus {
 				background: inherit;

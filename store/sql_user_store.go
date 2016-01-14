@@ -10,6 +10,10 @@ import (
 	"strings"
 )
 
+const (
+	MISSING_ACCOUNT_ERROR = "We couldn't find an existing account matching your email address for this team. This team may require an invite from the team owner to join."
+)
+
 type SqlUserStore struct {
 	*SqlStore
 }
@@ -266,7 +270,7 @@ func (us SqlUserStore) UpdatePassword(userId, hashedPassword string) StoreChanne
 
 		updateAt := model.GetMillis()
 
-		if _, err := us.GetMaster().Exec("UPDATE Users SET Password = :Password, LastPasswordUpdate = :LastPasswordUpdate, UpdateAt = :UpdateAt, FailedAttempts = 0 WHERE Id = :UserId AND AuthData = ''", map[string]interface{}{"Password": hashedPassword, "LastPasswordUpdate": updateAt, "UpdateAt": updateAt, "UserId": userId}); err != nil {
+		if _, err := us.GetMaster().Exec("UPDATE Users SET Password = :Password, LastPasswordUpdate = :LastPasswordUpdate, UpdateAt = :UpdateAt, AuthData = '', AuthService = '', FailedAttempts = 0 WHERE Id = :UserId", map[string]interface{}{"Password": hashedPassword, "LastPasswordUpdate": updateAt, "UpdateAt": updateAt, "UserId": userId}); err != nil {
 			result.Err = model.NewAppError("SqlUserStore.UpdatePassword", "We couldn't update the user password", "id="+userId+", "+err.Error())
 		} else {
 			result.Data = userId
@@ -298,6 +302,28 @@ func (us SqlUserStore) UpdateFailedPasswordAttempts(userId string, attempts int)
 	return storeChannel
 }
 
+func (us SqlUserStore) UpdateAuthData(userId, service, authData string) StoreChannel {
+
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		updateAt := model.GetMillis()
+
+		if _, err := us.GetMaster().Exec("UPDATE Users SET Password = '', LastPasswordUpdate = :LastPasswordUpdate, UpdateAt = :UpdateAt, FailedAttempts = 0, AuthService = :AuthService, AuthData = :AuthData WHERE Id = :UserId", map[string]interface{}{"LastPasswordUpdate": updateAt, "UpdateAt": updateAt, "UserId": userId, "AuthService": service, "AuthData": authData}); err != nil {
+			result.Err = model.NewAppError("SqlUserStore.UpdateAuthData", "We couldn't update the auth data", "id="+userId+", "+err.Error())
+		} else {
+			result.Data = userId
+		}
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
 func (us SqlUserStore) Get(id string) StoreChannel {
 
 	storeChannel := make(StoreChannel)
@@ -308,7 +334,7 @@ func (us SqlUserStore) Get(id string) StoreChannel {
 		if obj, err := us.GetReplica().Get(model.User{}, id); err != nil {
 			result.Err = model.NewAppError("SqlUserStore.Get", "We encountered an error finding the account", "user_id="+id+", "+err.Error())
 		} else if obj == nil {
-			result.Err = model.NewAppError("SqlUserStore.Get", "We couldn't find the existing account", "user_id="+id)
+			result.Err = model.NewAppError("SqlUserStore.Get", MISSING_ACCOUNT_ERROR, "user_id="+id)
 		} else {
 			result.Data = obj.(*model.User)
 		}
@@ -413,7 +439,7 @@ func (us SqlUserStore) GetByEmail(teamId string, email string) StoreChannel {
 		user := model.User{}
 
 		if err := us.GetReplica().SelectOne(&user, "SELECT * FROM Users WHERE TeamId = :TeamId AND Email = :Email", map[string]interface{}{"TeamId": teamId, "Email": email}); err != nil {
-			result.Err = model.NewAppError("SqlUserStore.GetByEmail", "We couldn't find the existing account", "teamId="+teamId+", email="+email+", "+err.Error())
+			result.Err = model.NewAppError("SqlUserStore.GetByEmail", MISSING_ACCOUNT_ERROR, "teamId="+teamId+", email="+email+", "+err.Error())
 		}
 
 		result.Data = &user
@@ -435,7 +461,7 @@ func (us SqlUserStore) GetByAuth(teamId string, authData string, authService str
 		user := model.User{}
 
 		if err := us.GetReplica().SelectOne(&user, "SELECT * FROM Users WHERE TeamId = :TeamId AND AuthData = :AuthData AND AuthService = :AuthService", map[string]interface{}{"TeamId": teamId, "AuthData": authData, "AuthService": authService}); err != nil {
-			result.Err = model.NewAppError("SqlUserStore.GetByAuth", "We couldn't find the existing account", "teamId="+teamId+", authData="+authData+", authService="+authService+", "+err.Error())
+			result.Err = model.NewAppError("SqlUserStore.GetByAuth", "We couldn't find an existing account matching your authentication type for this team. This team may require an invite from the team owner to join.", "teamId="+teamId+", authData="+authData+", authService="+authService+", "+err.Error())
 		}
 
 		result.Data = &user
@@ -457,7 +483,7 @@ func (us SqlUserStore) GetByUsername(teamId string, username string) StoreChanne
 		user := model.User{}
 
 		if err := us.GetReplica().SelectOne(&user, "SELECT * FROM Users WHERE TeamId = :TeamId AND Username = :Username", map[string]interface{}{"TeamId": teamId, "Username": username}); err != nil {
-			result.Err = model.NewAppError("SqlUserStore.GetByUsername", "We couldn't find the existing account", "teamId="+teamId+", username="+username+", "+err.Error())
+			result.Err = model.NewAppError("SqlUserStore.GetByUsername", "We couldn't find an existing account matching your username for this team. This team may require an invite from the team owner to join.", "teamId="+teamId+", username="+username+", "+err.Error())
 		}
 
 		result.Data = &user
@@ -540,12 +566,30 @@ func (us SqlUserStore) GetTotalActiveUsersCount() StoreChannel {
 	go func() {
 		result := StoreResult{}
 
-		time := model.GetMillis() - (1000 * 60 * 60 * 12)
+		time := model.GetMillis() - (1000 * 60 * 60 * 24)
 
 		if count, err := us.GetReplica().SelectInt("SELECT COUNT(Id) FROM Users WHERE LastActivityAt > :Time", map[string]interface{}{"Time": time}); err != nil {
 			result.Err = model.NewAppError("SqlUserStore.GetTotalActiveUsersCount", "We could not count the users", err.Error())
 		} else {
 			result.Data = count
+		}
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (us SqlUserStore) PermanentDelete(userId string) StoreChannel {
+
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		if _, err := us.GetMaster().Exec("DELETE FROM Users WHERE Id = :UserId", map[string]interface{}{"UserId": userId}); err != nil {
+			result.Err = model.NewAppError("SqlUserStore.GetByEmail", "We couldn't delete the existing account", "userId="+userId+", "+err.Error())
 		}
 
 		storeChannel <- result

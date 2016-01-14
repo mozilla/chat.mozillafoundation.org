@@ -1,19 +1,18 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
-const UserStore = require('./user_store.jsx');
-const PostStore = require('./post_store.jsx');
-const ChannelStore = require('./channel_store.jsx');
-const BrowserStore = require('./browser_store.jsx');
-const ErrorStore = require('./error_store.jsx');
-const EventEmitter = require('events').EventEmitter;
+import UserStore from './user_store.jsx';
+import PostStore from './post_store.jsx';
+import ChannelStore from './channel_store.jsx';
+import BrowserStore from './browser_store.jsx';
+import ErrorStore from './error_store.jsx';
+import EventEmitter from 'events';
 
-const Utils = require('../utils/utils.jsx');
-const AsyncClient = require('../utils/async_client.jsx');
+import * as Utils from '../utils/utils.jsx';
+import * as AsyncClient from '../utils/async_client.jsx';
+import * as EventHelpers from '../dispatcher/event_helpers.jsx';
 
-const Constants = require('../utils/constants.jsx');
-const ActionTypes = Constants.ActionTypes;
+import Constants from '../utils/constants.jsx';
 const SocketEvents = Constants.SocketEvents;
 
 const CHANGE_EVENT = 'change';
@@ -60,13 +59,14 @@ class SocketStoreClass extends EventEmitter {
             conn.onopen = () => {
                 if (this.failCount > 0) {
                     console.log('websocket re-established connection'); //eslint-disable-line no-console
+
+                    if (ErrorStore.getLastError()) {
+                        ErrorStore.storeLastError(null);
+                        ErrorStore.emitChange();
+                    }
                 }
 
                 this.failCount = 0;
-                if (ErrorStore.getLastError()) {
-                    ErrorStore.storeLastError(null);
-                    ErrorStore.emitChange();
-                }
             };
 
             conn.onclose = () => {
@@ -91,10 +91,9 @@ class SocketStoreClass extends EventEmitter {
             };
 
             conn.onmessage = (evt) => {
-                AppDispatcher.handleServerAction({
-                    type: ActionTypes.RECIEVED_MSG,
-                    msg: JSON.parse(evt.data)
-                });
+                const msg = JSON.parse(evt.data);
+                this.handleMessage(msg);
+                this.emitChange(msg);
             };
         }
     }
@@ -137,6 +136,10 @@ class SocketStoreClass extends EventEmitter {
             handleChannelViewedEvent(msg);
             break;
 
+        case SocketEvents.PREFERENCE_CHANGED:
+            handlePreferenceChangedEvent(msg);
+            break;
+
         default:
         }
     }
@@ -153,19 +156,19 @@ class SocketStoreClass extends EventEmitter {
 function handleNewPostEvent(msg) {
     // Store post
     const post = JSON.parse(msg.props.post);
-    PostStore.storePost(post);
+    EventHelpers.emitPostRecievedEvent(post);
 
     // Update channel state
     if (ChannelStore.getCurrentId() === msg.channel_id) {
         if (window.isActive) {
-            AsyncClient.updateLastViewedAt(true);
+            AsyncClient.updateLastViewedAt();
         }
     } else if (UserStore.getCurrentId() !== msg.user_id || post.type !== Constants.POST_TYPE_JOIN_LEAVE) {
         AsyncClient.getChannel(msg.channel_id);
     }
 
     // Send desktop notification
-    if (UserStore.getCurrentId() !== msg.user_id || post.props.from_webhook === 'true') {
+    if ((UserStore.getCurrentId() !== msg.user_id || post.props.from_webhook === 'true') && !Utils.isSystemMessage(post)) {
         const msgProps = msg.props;
 
         let mentions = [];
@@ -226,6 +229,7 @@ function handlePostEditEvent(msg) {
     // Store post
     const post = JSON.parse(msg.props.post);
     PostStore.storePost(post);
+    PostStore.emitChange();
 
     // Update channel state
     if (ChannelStore.getCurrentId() === msg.channel_id) {
@@ -237,20 +241,17 @@ function handlePostEditEvent(msg) {
 
 function handlePostDeleteEvent(msg) {
     const post = JSON.parse(msg.props.post);
-
-    PostStore.storeUnseenDeletedPost(post);
-    PostStore.removePost(post, true);
-    PostStore.emitChange();
+    EventHelpers.emitPostDeletedEvent(post);
 }
 
 function handleNewUserEvent() {
     AsyncClient.getProfiles();
-    AsyncClient.getChannelExtraInfo(true);
+    AsyncClient.getChannelExtraInfo();
 }
 
 function handleUserAddedEvent(msg) {
     if (ChannelStore.getCurrentId() === msg.channel_id) {
-        AsyncClient.getChannelExtraInfo(true);
+        AsyncClient.getChannelExtraInfo();
     }
 
     if (UserStore.getCurrentId() === msg.user_id) {
@@ -273,7 +274,7 @@ function handleUserRemovedEvent(msg) {
             $('#removed_from_channel').modal('show');
         }
     } else if (ChannelStore.getCurrentId() === msg.channel_id) {
-        AsyncClient.getChannelExtraInfo(true);
+        AsyncClient.getChannelExtraInfo();
     }
 }
 
@@ -284,19 +285,19 @@ function handleChannelViewedEvent(msg) {
     }
 }
 
+function handlePreferenceChangedEvent(msg) {
+    const preference = JSON.parse(msg.props.preference);
+    EventHelpers.emitPreferenceChangedEvent(preference);
+}
+
 var SocketStore = new SocketStoreClass();
 
-SocketStore.dispatchToken = AppDispatcher.register((payload) => {
+/*SocketStore.dispatchToken = AppDispatcher.register((payload) => {
     var action = payload.action;
 
     switch (action.type) {
-    case ActionTypes.RECIEVED_MSG:
-        SocketStore.handleMessage(action.msg);
-        SocketStore.emitChange(action.msg);
-        break;
-
     default:
     }
-});
+    });*/
 
 export default SocketStore;

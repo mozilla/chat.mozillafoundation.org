@@ -5,8 +5,8 @@ package model
 
 import (
 	"bytes"
-	l4g "code.google.com/p/log4go"
 	"fmt"
+	l4g "github.com/alecthomas/log4go"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -230,7 +230,7 @@ func (c *Client) CreateUser(user *User, hash string) (*Result, *AppError) {
 }
 
 func (c *Client) CreateUserFromSignup(user *User, data string, hash string) (*Result, *AppError) {
-	if r, err := c.DoApiPost("/users/create?d="+data+"&h="+hash, user.ToJson()); err != nil {
+	if r, err := c.DoApiPost("/users/create?d="+url.QueryEscape(data)+"&h="+hash, user.ToJson()); err != nil {
 		return nil, err
 	} else {
 		return &Result{r.Header.Get(HEADER_REQUEST_ID),
@@ -346,6 +346,24 @@ func (c *Client) GetSessions(id string) (*Result, *AppError) {
 	} else {
 		return &Result{r.Header.Get(HEADER_REQUEST_ID),
 			r.Header.Get(HEADER_ETAG_SERVER), SessionsFromJson(r.Body)}, nil
+	}
+}
+
+func (c *Client) SwitchToSSO(m map[string]string) (*Result, *AppError) {
+	if r, err := c.DoApiPost("/users/switch_to_sso", MapToJson(m)); err != nil {
+		return nil, err
+	} else {
+		return &Result{r.Header.Get(HEADER_REQUEST_ID),
+			r.Header.Get(HEADER_ETAG_SERVER), MapFromJson(r.Body)}, nil
+	}
+}
+
+func (c *Client) SwitchToEmail(m map[string]string) (*Result, *AppError) {
+	if r, err := c.DoApiPost("/users/switch_to_email", MapToJson(m)); err != nil {
+		return nil, err
+	} else {
+		return &Result{r.Header.Get(HEADER_REQUEST_ID),
+			r.Header.Get(HEADER_ETAG_SERVER), MapFromJson(r.Body)}, nil
 	}
 }
 
@@ -573,8 +591,8 @@ func (c *Client) UpdateLastViewedAt(channelId string) (*Result, *AppError) {
 	}
 }
 
-func (c *Client) GetChannelExtraInfo(id string, etag string) (*Result, *AppError) {
-	if r, err := c.DoApiGet("/channels/"+id+"/extra_info", "", etag); err != nil {
+func (c *Client) GetChannelExtraInfo(id string, memberLimit int, etag string) (*Result, *AppError) {
+	if r, err := c.DoApiGet("/channels/"+id+"/extra_info/"+strconv.FormatInt(int64(memberLimit), 10), "", etag); err != nil {
 		return nil, err
 	} else {
 		return &Result{r.Header.Get(HEADER_REQUEST_ID),
@@ -717,7 +735,7 @@ func (c *Client) GetFileInfo(url string) (*Result, *AppError) {
 		return nil, AppErrorFromJson(rp.Body)
 	} else {
 		return &Result{rp.Header.Get(HEADER_REQUEST_ID),
-			rp.Header.Get(HEADER_ETAG_SERVER), MapFromJson(rp.Body)}, nil
+			rp.Header.Get(HEADER_ETAG_SERVER), FileInfoFromJson(rp.Body)}, nil
 	}
 }
 

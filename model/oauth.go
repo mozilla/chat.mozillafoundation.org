@@ -10,10 +10,17 @@ import (
 	"unicode/utf8"
 )
 
+const (
+	OAUTH_ACTION_SIGNUP       = "signup"
+	OAUTH_ACTION_LOGIN        = "login"
+	OAUTH_ACTION_EMAIL_TO_SSO = "email_to_sso"
+	OAUTH_ACTION_SSO_TO_EMAIL = "sso_to_email"
+)
+
 type OAuthApp struct {
 	Id           string      `json:"id"`
 	CreatorId    string      `json:"creator_id"`
-	CreateAt     int64       `json:"update_at"`
+	CreateAt     int64       `json:"create_at"`
 	UpdateAt     int64       `json:"update_at"`
 	ClientSecret string      `json:"client_secret"`
 	Name         string      `json:"name"`

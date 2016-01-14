@@ -30,7 +30,7 @@ func NewSqlPostStore(sqlStore *SqlStore) PostStore {
 		table.ColMap("Message").SetMaxSize(4000)
 		table.ColMap("Type").SetMaxSize(26)
 		table.ColMap("Hashtags").SetMaxSize(1000)
-		table.ColMap("Props")
+		table.ColMap("Props").SetMaxSize(8000)
 		table.ColMap("Filenames").SetMaxSize(4000)
 	}
 
@@ -38,7 +38,6 @@ func NewSqlPostStore(sqlStore *SqlStore) PostStore {
 }
 
 func (s SqlPostStore) UpgradeSchemaIfNeeded() {
-	s.RemoveColumnIfExists("Posts", "ImgCount") // remove after 1.3 release
 }
 
 func (s SqlPostStore) CreateIndexesIfNotExists() {
@@ -219,6 +218,99 @@ func (s SqlPostStore) Delete(postId string, time int64) StoreChannel {
 		_, err := s.GetMaster().Exec("Update Posts SET DeleteAt = :DeleteAt, UpdateAt = :UpdateAt WHERE Id = :Id OR ParentId = :ParentId OR RootId = :RootId", map[string]interface{}{"DeleteAt": time, "UpdateAt": time, "Id": postId, "ParentId": postId, "RootId": postId})
 		if err != nil {
 			result.Err = model.NewAppError("SqlPostStore.Delete", "We couldn't delete the post", "id="+postId+", err="+err.Error())
+		}
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (s SqlPostStore) permanentDelete(postId string) StoreChannel {
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		_, err := s.GetMaster().Exec("DELETE FROM Posts WHERE Id = :Id OR ParentId = :ParentId OR RootId = :RootId", map[string]interface{}{"Id": postId, "ParentId": postId, "RootId": postId})
+		if err != nil {
+			result.Err = model.NewAppError("SqlPostStore.Delete", "We couldn't delete the post", "id="+postId+", err="+err.Error())
+		}
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (s SqlPostStore) permanentDeleteAllCommentByUser(userId string) StoreChannel {
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		_, err := s.GetMaster().Exec("DELETE FROM Posts WHERE UserId = :UserId AND RootId != ''", map[string]interface{}{"UserId": userId})
+		if err != nil {
+			result.Err = model.NewAppError("SqlPostStore.permanentDeleteAllCommentByUser", "We couldn't delete the comments for user", "userId="+userId+", err="+err.Error())
+		}
+
+		storeChannel <- result
+		close(storeChannel)
+	}()
+
+	return storeChannel
+}
+
+func (s SqlPostStore) PermanentDeleteByUser(userId string) StoreChannel {
+	storeChannel := make(StoreChannel)
+
+	go func() {
+		result := StoreResult{}
+
+		// First attempt to delete all the comments for a user
+		if r := <-s.permanentDeleteAllCommentByUser(userId); r.Err != nil {
+			result.Err = r.Err
+			storeChannel <- result
+			close(storeChannel)
+			return
+		}
+
+		// Now attempt to delete all the root posts for a user.  This will also
+		// delete all the comments for each post.
+		found := true
+		count := 0
+
+		for found {
+			var ids []string
+			_, err := s.GetMaster().Select(&ids, "SELECT Id FROM Posts WHERE UserId = :UserId LIMIT 1000", map[string]interface{}{"UserId": userId})
+			if err != nil {
+				result.Err = model.NewAppError("SqlPostStore.PermanentDeleteByUser.select", "We couldn't select the posts to delete for the user", "userId="+userId+", err="+err.Error())
+				storeChannel <- result
+				close(storeChannel)
+				return
+			} else {
+				found = false
+				for _, id := range ids {
+					found = true
+					if r := <-s.permanentDelete(id); r.Err != nil {
+						result.Err = r.Err
+						storeChannel <- result
+						close(storeChannel)
+						return
+					}
+				}
+			}
+
+			// This is a fail safe, give up if more than 10K messages
+			count = count + 1
+			if count >= 10 {
+				result.Err = model.NewAppError("SqlPostStore.PermanentDeleteByUser.toolarge", "We couldn't select the posts to delete for the user (too many), please re-run", "userId="+userId)
+				storeChannel <- result
+				close(storeChannel)
+				return
+			}
 		}
 
 		storeChannel <- result
@@ -477,7 +569,8 @@ func (s SqlPostStore) getParentsPosts(channelId string, offset int, limit int) S
 			            AND DeleteAt = 0
 			    ORDER BY CreateAt DESC
 			    LIMIT :Limit OFFSET :Offset) q3
-			    WHERE q3.RootId != '') q1 ON q1.RootId = q2.Id
+			    WHERE q3.RootId != '') q1
+			    ON q1.RootId = q2.Id OR q1.RootId = q2.RootId
 			WHERE
 			    ChannelId = :ChannelId2
 			        AND DeleteAt = 0
@@ -714,6 +807,7 @@ func (s SqlPostStore) AnalyticsUserCountsWithPostsByDay(teamId string) StoreChan
 			    WHERE
 			        Posts.ChannelId = Channels.Id
 			            AND Channels.TeamId = :TeamId
+			            AND Posts.CreateAt <= :EndTime
 			    ORDER BY Name DESC) AS t1
 			GROUP BY Name
 			ORDER BY Name DESC
@@ -732,17 +826,20 @@ func (s SqlPostStore) AnalyticsUserCountsWithPostsByDay(teamId string) StoreChan
 				    WHERE
 				        Posts.ChannelId = Channels.Id
 				            AND Channels.TeamId = :TeamId
+				            AND Posts.CreateAt <= :EndTime
 				    ORDER BY Name DESC) AS t1
 				GROUP BY Name
 				ORDER BY Name DESC
 				LIMIT 30`
 		}
 
+		end := utils.MillisFromTime(utils.EndOfDay(utils.Yesterday()))
+
 		var rows model.AnalyticsRows
 		_, err := s.GetReplica().Select(
 			&rows,
 			query,
-			map[string]interface{}{"TeamId": teamId, "Time": model.GetMillis() - 1000*60*60*24*31})
+			map[string]interface{}{"TeamId": teamId, "EndTime": end})
 		if err != nil {
 			result.Err = model.NewAppError("SqlPostStore.AnalyticsUserCountsWithPostsByDay", "We couldn't get user counts with posts", err.Error())
 		} else {
@@ -774,7 +871,8 @@ func (s SqlPostStore) AnalyticsPostCountsByDay(teamId string) StoreChannel {
 			    WHERE
 			        Posts.ChannelId = Channels.Id
 			            AND Channels.TeamId = :TeamId
-			            AND Posts.CreateAt >:Time) AS t1
+			            AND Posts.CreateAt <= :EndTime
+			            AND Posts.CreateAt >= :StartTime) AS t1
 			GROUP BY Name
 			ORDER BY Name DESC
 			LIMIT 30`
@@ -792,17 +890,21 @@ func (s SqlPostStore) AnalyticsPostCountsByDay(teamId string) StoreChannel {
 				    WHERE
 				        Posts.ChannelId = Channels.Id
 				            AND Channels.TeamId = :TeamId
-				            AND Posts.CreateAt > :Time) AS t1
+				            AND Posts.CreateAt <= :EndTime
+				            AND Posts.CreateAt >= :StartTime) AS t1
 				GROUP BY Name
 				ORDER BY Name DESC
 				LIMIT 30`
 		}
 
+		end := utils.MillisFromTime(utils.EndOfDay(utils.Yesterday()))
+		start := utils.MillisFromTime(utils.StartOfDay(utils.Yesterday().AddDate(0, 0, -31)))
+
 		var rows model.AnalyticsRows
 		_, err := s.GetReplica().Select(
 			&rows,
 			query,
-			map[string]interface{}{"TeamId": teamId, "Time": model.GetMillis() - 1000*60*60*24*31})
+			map[string]interface{}{"TeamId": teamId, "StartTime": start, "EndTime": end})
 		if err != nil {
 			result.Err = model.NewAppError("SqlPostStore.AnalyticsPostCountsByDay", "We couldn't get post counts by day", err.Error())
 		} else {

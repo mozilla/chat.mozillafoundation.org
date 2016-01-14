@@ -1,7 +1,7 @@
+@charset "UTF-8";
+
 .inner__wrap {
-	@include single-transition(transform, 0.5s, ease);
 	&.move--left {
-		margin-right: 400px;
 		.search-bar__container {
 			display: none;
 		}
@@ -18,18 +18,35 @@
 	margin-left: 220px;
 	position: relative;
 	background: #fff;
-    @include display-flex;
-    @include flex-direction(column);
+	@include display-flex;
+	@include flex-direction(column);
 	.channel__wrap & {
 		padding-top: 0;
 	}
 }
 #post-create {
-    @include flex(0 0 auto);
+	@include flex(0 0 auto);
 	background: #fff;
 	width: 100%;
 	z-index: 3;
 }
+
+#archive-link-home {
+	@include flex(0 0 auto);
+	cursor: pointer;
+	padding: 10px 20px;
+	font-size: 13px;
+
+	.fa {
+		@include opacity(0.7);
+	}
+
+	a {
+		color: inherit;
+	}
+
+}
+
 .post-list {
 	.new-messages-hr {
 		margin-top: 5px;

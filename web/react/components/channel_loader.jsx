@@ -5,14 +5,15 @@
     to the server on page load. This is to prevent other React controls from spamming
     AsyncClient with requests. */
 
-var AsyncClient = require('../utils/async_client.jsx');
-var SocketStore = require('../stores/socket_store.jsx');
-var ChannelStore = require('../stores/channel_store.jsx');
-var PostStore = require('../stores/post_store.jsx');
-var UserStore = require('../stores/user_store.jsx');
+import * as AsyncClient from '../utils/async_client.jsx';
+import SocketStore from '../stores/socket_store.jsx';
+import ChannelStore from '../stores/channel_store.jsx';
+import PostStore from '../stores/post_store.jsx';
+import UserStore from '../stores/user_store.jsx';
+import PreferenceStore from '../stores/preference_store.jsx';
 
-var Utils = require('../utils/utils.jsx');
-var Constants = require('../utils/constants.jsx');
+import * as Utils from '../utils/utils.jsx';
+import Constants from '../utils/constants.jsx';
 
 export default class ChannelLoader extends React.Component {
     constructor(props) {
@@ -27,8 +28,8 @@ export default class ChannelLoader extends React.Component {
     componentDidMount() {
         /* Initial aysnc loads */
         AsyncClient.getPosts(ChannelStore.getCurrentId());
-        AsyncClient.getChannels(true, true);
-        AsyncClient.getChannelExtraInfo(true);
+        AsyncClient.getChannels();
+        AsyncClient.getChannelExtraInfo();
         AsyncClient.findTeams();
         AsyncClient.getMyTeam();
         setTimeout(() => AsyncClient.getStatuses(), 3000); // temporary until statuses are reworked a bit
@@ -68,6 +69,10 @@ export default class ChannelLoader extends React.Component {
         } else {
             Utils.applyTheme(Constants.THEMES.default);
         }
+
+        // if preferences have already been stored in local storage do not wait until preference store change is fired and handled in channel.jsx
+        const selectedFont = PreferenceStore.get(Constants.Preferences.CATEGORY_DISPLAY_SETTINGS, 'selected_font', Constants.DEFAULT_FONT);
+        Utils.applyFont(selectedFont);
 
         $('body').on('mouseenter mouseleave', '.post', function mouseOver(ev) {
             if (ev.type === 'mouseenter') {

@@ -1,97 +1,21 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const Utils = require('../utils/utils.jsx');
-const Client = require('../utils/client.jsx');
-const UserStore = require('../stores/user_store.jsx');
-const BrowserStore = require('../stores/browser_store.jsx');
+import LoginEmail from './login_email.jsx';
+import LoginLdap from './login_ldap.jsx';
+
+import * as Utils from '../utils/utils.jsx';
+import Constants from '../utils/constants.jsx';
 
 export default class Login extends React.Component {
     constructor(props) {
         super(props);
 
-        this.handleSubmit = this.handleSubmit.bind(this);
-
         this.state = {};
     }
-    handleSubmit(e) {
-        e.preventDefault();
-        var state = {};
-
-        const name = this.props.teamName;
-        if (!name) {
-            state.serverError = 'Bad team name';
-            this.setState(state);
-            return;
-        }
-
-        const email = ReactDOM.findDOMNode(this.refs.email).value.trim();
-        if (!email) {
-            state.serverError = 'An email is required';
-            this.setState(state);
-            return;
-        }
-
-        const password = ReactDOM.findDOMNode(this.refs.password).value.trim();
-        if (!password) {
-            state.serverError = 'A password is required';
-            this.setState(state);
-            return;
-        }
-
-        if (!BrowserStore.isLocalStorageSupported()) {
-            state.serverError = 'This service requires local storage to be enabled. Please enable it or exit private browsing.';
-            this.setState(state);
-            return;
-        }
-
-        state.serverError = '';
-        this.setState(state);
-
-        Client.loginByEmail(name, email, password,
-            () => {
-                UserStore.setLastEmail(email);
-
-                const redirect = Utils.getUrlParameter('redirect');
-                if (redirect) {
-                    window.location.href = decodeURIComponent(redirect);
-                } else {
-                    window.location.href = '/' + name + '/channels/town-square';
-                }
-            },
-            (err) => {
-                if (err.message === 'Login failed because email address has not been verified') {
-                    window.location.href = '/verify_email?teamname=' + encodeURIComponent(name) + '&email=' + encodeURIComponent(email);
-                    return;
-                }
-                state.serverError = err.message;
-                this.valid = false;
-                this.setState(state);
-            }
-        );
-    }
     render() {
-        let serverError;
-        if (this.state.serverError) {
-            serverError = <label className='control-label'>{this.state.serverError}</label>;
-        }
-        let priorEmail = UserStore.getLastEmail();
-
-        const emailParam = Utils.getUrlParameter('email');
-        if (emailParam) {
-            priorEmail = decodeURIComponent(emailParam);
-        }
-
         const teamDisplayName = this.props.teamDisplayName;
         const teamName = this.props.teamName;
-
-        let focusEmail = false;
-        let focusPassword = false;
-        if (priorEmail === '') {
-            focusEmail = true;
-        } else {
-            focusPassword = true;
-        }
 
         let loginMessage = [];
         if (global.window.mm_config.EnableSignUpWithGitLab === 'true') {
@@ -106,58 +30,44 @@ export default class Login extends React.Component {
            );
         }
 
-        let errorClass = '';
-        if (serverError) {
-            errorClass = ' has-error';
+        if (global.window.mm_config.EnableSignUpWithGoogle === 'true') {
+            loginMessage.push(
+                    <a
+                        className='btn btn-custom-login google'
+                        href={'/' + teamName + '/login/google'}
+                    >
+                        <span className='icon' />
+                        <span>{'with Google Apps'}</span>
+                    </a>
+           );
         }
 
-        const verifiedParam = Utils.getUrlParameter('verified');
-        let verifiedBox = '';
-        if (verifiedParam) {
-            verifiedBox = (
-                <div className='alert alert-success'>
-                    <i className='fa fa-check' />
-                    {' Email Verified'}
-                </div>
-            );
+        const extraParam = Utils.getUrlParameter('extra');
+        let extraBox = '';
+        if (extraParam) {
+            let msg;
+            if (extraParam === Constants.SIGNIN_CHANGE) {
+                msg = ' Sign-in method changed successfully';
+            } else if (extraParam === Constants.SIGNIN_VERIFIED) {
+                msg = ' Email Verified';
+            }
+
+            if (msg != null) {
+                extraBox = (
+                    <div className='alert alert-success'>
+                        <i className='fa fa-check' />
+                        {msg}
+                    </div>
+                );
+            }
         }
 
         let emailSignup;
         if (global.window.mm_config.EnableSignUpWithEmail === 'true') {
             emailSignup = (
-                <div className='signup__email-container'>
-                    <div className={'form-group' + errorClass}>
-                        <input
-                            autoFocus={focusEmail}
-                            type='email'
-                            className='form-control'
-                            name='email'
-                            defaultValue={priorEmail}
-                            ref='email'
-                            placeholder='Email'
-                            spellCheck='false'
-                        />
-                    </div>
-                    <div className={'form-group' + errorClass}>
-                        <input
-                            autoFocus={focusPassword}
-                            type='password'
-                            className='form-control'
-                            name='password'
-                            ref='password'
-                            placeholder='Password'
-                            spellCheck='false'
-                        />
-                    </div>
-                    <div className='form-group'>
-                        <button
-                            type='submit'
-                            className='btn btn-primary'
-                        >
-                            {'Sign in'}
-                        </button>
-                    </div>
-                </div>
+                <LoginEmail
+                    teamName={this.props.teamName}
+                />
             );
         }
 
@@ -201,15 +111,22 @@ export default class Login extends React.Component {
         if (global.window.mm_config.EnableTeamCreation === 'true') {
             teamSignUp = (
                 <div className='margin--extra'>
-                    <span>{'Want to create your own team? '}
-                        <a
-                            href='/'
-                            className='signup-team-login'
-                        >
-                            {'Create one now'}
-                        </a>
-                    </span>
+                    <a
+                        href='/'
+                        className='signup-team-login'
+                    >
+                        {'Create a new team'}
+                    </a>
                 </div>
+            );
+        }
+
+        let ldapLogin = null;
+        if (global.window.mm_config.EnableLdap === 'true') {
+            ldapLogin = (
+                <LoginLdap
+                    teamName={this.props.teamName}
+                />
             );
         }
 
@@ -218,20 +135,16 @@ export default class Login extends React.Component {
                 <h5 className='margin--less'>{'Sign in to:'}</h5>
                 <h2 className='signup-team__name'>{teamDisplayName}</h2>
                 <h2 className='signup-team__subdomain'>{'on '}{global.window.mm_config.SiteName}</h2>
-                <form onSubmit={this.handleSubmit}>
-                    {verifiedBox}
-                    <div className={'form-group' + errorClass}>
-                        {serverError}
-                    </div>
+                    {extraBox}
                     {loginMessage}
                     {emailSignup}
+                    {ldapLogin}
                     {userSignUp}
                     <div className='form-group margin--extra form-group--small'>
-                        <span><a href='/find_team'>{'Find other teams'}</a></span>
+                        <span><a href='/find_team'>{'Find your other teams'}</a></span>
                     </div>
                     {forgotPassword}
                     {teamSignUp}
-                </form>
             </div>
         );
     }

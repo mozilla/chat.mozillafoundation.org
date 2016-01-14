@@ -1,3 +1,5 @@
+@charset "UTF-8";
+
 .channel-header__info .popover-content {
 	max-height: 250px;
 	overflow: auto;
@@ -6,6 +8,10 @@
 .user-popover {
 	cursor: pointer;
 	display: inline-block;
+}
+
+.code-popover .popover-content {
+    padding: 5px;
 }
 
 .user-popover__image {
@@ -79,6 +85,11 @@
             background: rgba(black, 0.2);
         }
 
+        .fa {
+            margin-right: 5px;
+            @include opacity(0.5);
+        }
+
         .profile-img {
             margin-top: -1px;
             height: 16px;
@@ -94,6 +105,8 @@
     }
 
     .popover-content {
+        max-height: 500px;
+        overflow: auto;
         padding: 3px 13px;
     }
 

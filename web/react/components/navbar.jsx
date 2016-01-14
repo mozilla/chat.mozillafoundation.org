@@ -1,23 +1,28 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const EditChannelPurposeModal = require('./edit_channel_purpose_modal.jsx');
-const MessageWrapper = require('./message_wrapper.jsx');
-const NotifyCounts = require('./notify_counts.jsx');
-const ChannelMembersModal = require('./channel_members_modal.jsx');
-const ChannelInviteModal = require('./channel_invite_modal.jsx');
+import EditChannelHeaderModal from './edit_channel_header_modal.jsx';
+import EditChannelPurposeModal from './edit_channel_purpose_modal.jsx';
+import MessageWrapper from './message_wrapper.jsx';
+import NotifyCounts from './notify_counts.jsx';
+import ChannelMembersModal from './channel_members_modal.jsx';
+import ChannelInfoModal from './channel_info_modal.jsx';
+import ChannelInviteModal from './channel_invite_modal.jsx';
+import ChannelNotificationsModal from './channel_notifications_modal.jsx';
+import DeleteChannelModal from './delete_channel_modal.jsx';
+import ToggleModalButton from './toggle_modal_button.jsx';
 
-const UserStore = require('../stores/user_store.jsx');
-const ChannelStore = require('../stores/channel_store.jsx');
-const TeamStore = require('../stores/team_store.jsx');
+import UserStore from '../stores/user_store.jsx';
+import ChannelStore from '../stores/channel_store.jsx';
+import TeamStore from '../stores/team_store.jsx';
 
-const Client = require('../utils/client.jsx');
-const AsyncClient = require('../utils/async_client.jsx');
-const Utils = require('../utils/utils.jsx');
+import * as Client from '../utils/client.jsx';
+import * as AsyncClient from '../utils/async_client.jsx';
+import * as Utils from '../utils/utils.jsx';
 
-const Constants = require('../utils/constants.jsx');
+import Constants from '../utils/constants.jsx';
 const ActionTypes = Constants.ActionTypes;
-const AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
+import AppDispatcher from '../dispatcher/app_dispatcher.jsx';
 
 const Popover = ReactBootstrap.Popover;
 const OverlayTrigger = ReactBootstrap.OverlayTrigger;
@@ -28,13 +33,17 @@ export default class Navbar extends React.Component {
 
         this.onChange = this.onChange.bind(this);
         this.handleLeave = this.handleLeave.bind(this);
+        this.showSearch = this.showSearch.bind(this);
+
+        this.showEditChannelHeaderModal = this.showEditChannelHeaderModal.bind(this);
+
         this.createCollapseButtons = this.createCollapseButtons.bind(this);
         this.createDropdown = this.createDropdown.bind(this);
 
         const state = this.getStateFromStores();
         state.showEditChannelPurposeModal = false;
+        state.showEditChannelHeaderModal = false;
         state.showMembersModal = false;
-        state.showInviteModal = false;
         this.state = state;
     }
     getStateFromStores() {
@@ -96,23 +105,36 @@ export default class Navbar extends React.Component {
         $('.inner__wrap').toggleClass('move--left-small');
         $('.sidebar--menu').toggleClass('move--left');
     }
+    showSearch() {
+        AppDispatcher.handleServerAction({
+            type: ActionTypes.SHOW_SEARCH
+        });
+    }
     onChange() {
         this.setState(this.getStateFromStores());
         $('#navbar .navbar-brand .description').popover({placement: 'bottom', trigger: 'click', html: true});
+    }
+    showEditChannelHeaderModal() {
+        // this can't be done using a ToggleModalButton because we can't use one inside an OverlayTrigger
+        if (this.refs.headerOverlay) {
+            this.refs.headerOverlay.hide();
+        }
+
+        this.setState({
+            showEditChannelHeaderModal: true
+        });
     }
     createDropdown(channel, channelTitle, isAdmin, isDirect, popoverContent) {
         if (channel) {
             var viewInfoOption = (
                 <li role='presentation'>
-                    <a
+                    <ToggleModalButton
                         role='menuitem'
-                        data-toggle='modal'
-                        data-target='#channel_info'
-                        data-channelid={channel.id}
-                        href='#'
+                        dialogType={ChannelInfoModal}
+                        dialogProps={{channel}}
                     >
                         {'View Info'}
-                    </a>
+                    </ToggleModalButton>
                 </li>
             );
 
@@ -121,11 +143,7 @@ export default class Navbar extends React.Component {
                     <a
                         role='menuitem'
                         href='#'
-                        data-toggle='modal'
-                        data-target='#edit_channel'
-                        data-header={channel.header}
-                        data-title={channel.display_name}
-                        data-channelid={channel.id}
+                        onClick={this.showEditChannelHeaderModal}
                     >
                         {'Set Channel Header...'}
                     </a>
@@ -152,13 +170,13 @@ export default class Navbar extends React.Component {
             if (!isDirect && !ChannelStore.isDefault(channel)) {
                 addMembersOption = (
                     <li role='presentation'>
-                        <a
+                        <ToggleModalButton
                             role='menuitem'
-                            href='#'
-                            onClick={() => this.setState({showInviteModal: false})}
+                            dialogType={ChannelInviteModal}
+                            dialogProps={{channel}}
                         >
                             {'Add Members'}
-                        </a>
+                        </ToggleModalButton>
                     </li>
                 );
 
@@ -194,16 +212,13 @@ export default class Navbar extends React.Component {
 
                     deleteChannelOption = (
                         <li role='presentation'>
-                            <a
+                            <ToggleModalButton
                                 role='menuitem'
-                                href='#'
-                                data-toggle='modal'
-                                data-target='#delete_channel'
-                                data-title={channel.display_name}
-                                data-channelid={channel.id}
+                                dialogType={DeleteChannelModal}
+                                dialogProps={{channel}}
                             >
                                 {'Delete Channel...'}
-                            </a>
+                            </ToggleModalButton>
                         </li>
                     );
                 }
@@ -229,16 +244,13 @@ export default class Navbar extends React.Component {
             if (!isDirect) {
                 notificationPreferenceOption = (
                     <li role='presentation'>
-                        <a
+                        <ToggleModalButton
                             role='menuitem'
-                            href='#'
-                            data-toggle='modal'
-                            data-target='#channel_notifications'
-                            data-title={channel.display_name}
-                            data-channelid={channel.id}
+                            dialogType={ChannelNotificationsModal}
+                            dialogProps={{channel}}
                         >
                             {'Notification Preferences'}
-                        </a>
+                        </ToggleModalButton>
                     </li>
                 );
             }
@@ -247,6 +259,7 @@ export default class Navbar extends React.Component {
                 <div className='navbar-brand'>
                     <div className='dropdown'>
                         <OverlayTrigger
+                            ref='headerOverlay'
                             trigger='click'
                             placement='bottom'
                             overlay={popoverContent}
@@ -259,7 +272,6 @@ export default class Navbar extends React.Component {
                             href='#'
                             className='dropdown-toggle theme'
                             type='button'
-                            id='channel_header_dropdown'
                             data-toggle='dropdown'
                             aria-expanded='true'
                         >
@@ -269,7 +281,6 @@ export default class Navbar extends React.Component {
                         <ul
                             className='dropdown-menu'
                             role='menu'
-                            aria-labelledby='channel_header_dropdown'
                         >
                             {viewInfoOption}
                             {addMembersOption}
@@ -356,6 +367,9 @@ export default class Navbar extends React.Component {
         var isAdmin = false;
         var isDirect = false;
 
+        var editChannelHeaderModal = null;
+        var editChannelPurposeModal = null;
+
         if (channel) {
             popoverContent = (
                 <Popover
@@ -398,11 +412,7 @@ export default class Navbar extends React.Component {
                             <br/>
                             <a
                                 href='#'
-                                data-toggle='modal'
-                                data-header={channel.header}
-                                data-title={channel.display_name}
-                                data-channelid={channel.id}
-                                data-target='#edit_channel'
+                                onClick={this.showEditChannelHeaderModal}
                             >
                                 {'Click here'}
                             </a>
@@ -411,9 +421,35 @@ export default class Navbar extends React.Component {
                     </Popover>
                 );
             }
+
+            editChannelHeaderModal = (
+                <EditChannelHeaderModal
+                    show={this.state.showEditChannelHeaderModal}
+                    onHide={() => this.setState({showEditChannelHeaderModal: false})}
+                    channel={channel}
+                />
+            );
+
+            editChannelPurposeModal = (
+                <EditChannelPurposeModal
+                    show={this.state.showEditChannelPurposeModal}
+                    onModalDismissed={() => this.setState({showEditChannelPurposeModal: false})}
+                    channel={channel}
+                />
+            );
         }
 
         var collapseButtons = this.createCollapseButtons(currentId);
+
+        const searchButton = (
+            <button
+                type='button'
+                className='navbar-toggle pull-right'
+                onClick={this.showSearch}
+            >
+                <span className='glyphicon glyphicon-search icon--white' />
+            </button>
+        );
 
         var channelMenuDropdown = this.createDropdown(channel, channelTitle, isAdmin, isDirect, popoverContent);
 
@@ -426,22 +462,17 @@ export default class Navbar extends React.Component {
                     <div className='container-fluid theme'>
                         <div className='navbar-header'>
                             {collapseButtons}
+                            {searchButton}
                             {channelMenuDropdown}
                         </div>
                     </div>
                 </nav>
-                <EditChannelPurposeModal
-                    show={this.state.showEditChannelPurposeModal}
-                    onModalDismissed={() => this.setState({showEditChannelPurposeModal: false})}
-                    channel={channel}
-                />
+                {editChannelHeaderModal}
+                {editChannelPurposeModal}
                 <ChannelMembersModal
                     show={this.state.showMembersModal}
                     onModalDismissed={() => this.setState({showMembersModal: false})}
-                />
-                <ChannelInviteModal
-                    show={this.state.showInviteModal}
-                    onModalDismissed={() => this.setState({showInviteModal: false})}
+                    channel={{channel}}
                 />
             </div>
         );

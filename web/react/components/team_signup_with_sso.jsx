@@ -1,9 +1,9 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var utils = require('../utils/utils.jsx');
-var client = require('../utils/client.jsx');
-var Constants = require('../utils/constants.jsx');
+import * as utils from '../utils/utils.jsx';
+import * as client from '../utils/client.jsx';
+import Constants from '../utils/constants.jsx';
 
 export default class SSOSignUpPage extends React.Component {
     constructor(props) {
@@ -86,6 +86,18 @@ export default class SSOSignUpPage extends React.Component {
                 >
                     <span className='icon'/>
                     <span>{'Create team with GitLab Account'}</span>
+                </a>
+            );
+        } else if (this.props.service === Constants.GOOGLE_SERVICE) {
+            button = (
+                <a
+                    className='btn btn-custom-login google btn-full'
+                    href='#'
+                    onClick={this.handleSubmit}
+                    disabled={disabled}
+                >
+                    <span className='icon'/>
+                    <span>{'Create team with Google Apps Account'}</span>
                 </a>
             );
         }

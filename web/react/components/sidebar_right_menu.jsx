@@ -1,12 +1,13 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var InviteMemberModal = require('./invite_member_modal.jsx');
-var UserSettingsModal = require('./user_settings/user_settings_modal.jsx');
-var UserStore = require('../stores/user_store.jsx');
-var TeamStore = require('../stores/team_store.jsx');
-var client = require('../utils/client.jsx');
-var utils = require('../utils/utils.jsx');
+import TeamMembersModal from './team_members_modal.jsx';
+import ToggleModalButton from './toggle_modal_button.jsx';
+import UserSettingsModal from './user_settings/user_settings_modal.jsx';
+import UserStore from '../stores/user_store.jsx';
+import * as client from '../utils/client.jsx';
+import * as EventHelpers from '../dispatcher/event_helpers.jsx';
+import * as utils from '../utils/utils.jsx';
 
 export default class SidebarRightMenu extends React.Component {
     componentDidMount() {
@@ -46,9 +47,9 @@ export default class SidebarRightMenu extends React.Component {
                 <li>
                     <a
                         href='#'
-                        onClick={InviteMemberModal.show}
+                        onClick={EventHelpers.showInviteMemberModal}
                     >
-                        <i className='fa fa-user'></i>Invite New Member
+                        <i className='fa fa-user'></i>{'Invite New Member'}
                     </a>
                 </li>
             );
@@ -56,12 +57,12 @@ export default class SidebarRightMenu extends React.Component {
             if (this.props.teamType === 'O') {
                 teamLink = (
                     <li>
-                        <a href='#'
-                            data-toggle='modal'
-                            data-target='#get_link'
-                            data-title='Team Invite'
-                            data-value={utils.getWindowLocationOrigin() + '/signup_user_complete/?id=' + TeamStore.getCurrent().invite_id}
-                        ><i className='fa fa-link'></i>Get Team Invite Link</a>
+                        <a
+                            href='#'
+                            onClick={EventHelpers.showGetTeamInviteLinkModal}
+                        >
+                            <i className='glyphicon glyphicon-link'></i>{'Get Team Invite Link'}
+                        </a>
                     </li>
                 );
             }
@@ -74,28 +75,25 @@ export default class SidebarRightMenu extends React.Component {
                         href='#'
                         data-toggle='modal'
                         data-target='#team_settings'
-                    ><i className='fa fa-globe'></i>Team Settings</a>
+                    ><i className='fa fa-globe'></i>{'Team Settings'}</a>
                 </li>
             );
             manageLink = (
                 <li>
-                    <a
-                        href='#'
-                        data-toggle='modal'
-                        data-target='#team_members'
-                    >
-                    <i className='fa fa-users'></i>Manage Members</a>
+                    <ToggleModalButton dialogType={TeamMembersModal}>
+                        <i className='fa fa-users'></i>{'Manage Members'}
+                    </ToggleModalButton>
                 </li>
             );
         }
 
-        if (isSystemAdmin) {
+        if (isSystemAdmin && !utils.isMobile()) {
             consoleLink = (
                 <li>
                     <a
                         href={'/admin_console?' + utils.getSessionIndex()}
                     >
-                    <i className='fa fa-wrench'></i>System Console</a>
+                    <i className='fa fa-wrench'></i>{'System Console'}</a>
                 </li>
             );
         }
@@ -109,6 +107,27 @@ export default class SidebarRightMenu extends React.Component {
             teamDisplayName = this.props.teamDisplayName;
         }
 
+        let helpLink = null;
+        if (global.window.mm_config.HelpLink) {
+            helpLink = (
+                <li>
+                    <a
+                        target='_blank'
+                        href={global.window.mm_config.HelpLink}
+                    ><i className='fa fa-question'></i>{'Help'}</a></li>
+            );
+        }
+
+        let reportLink = null;
+        if (global.window.mm_config.ReportAProblemLink) {
+            reportLink = (
+                <li>
+                    <a
+                        target='_blank'
+                        href={global.window.mm_config.ReportAProblemLink}
+                    ><i className='fa fa-phone'></i>{'Report a Problem'}</a></li>
+            );
+        }
         return (
             <div>
                 <div className='team__header theme'>
@@ -125,7 +144,7 @@ export default class SidebarRightMenu extends React.Component {
                                 href='#'
                                 onClick={() => this.setState({showUserSettingsModal: true})}
                             >
-                                <i className='fa fa-cog'></i>Account Settings
+                                <i className='fa fa-cog'></i>{'Account Settings'}
                             </a>
                         </li>
                         {teamSettingsLink}
@@ -137,18 +156,10 @@ export default class SidebarRightMenu extends React.Component {
                             <a
                                 href='#'
                                 onClick={this.handleLogoutClick}
-                            ><i className='fa fa-sign-out'></i>Logout</a></li>
+                            ><i className='fa fa-sign-out'></i>{'Logout'}</a></li>
                         <li className='divider'></li>
-                        <li>
-                            <a
-                                target='_blank'
-                                href='/static/help/configure_links.html'
-                            ><i className='fa fa-question'></i>Help</a></li>
-                        <li>
-                            <a
-                                target='_blank'
-                                href='/static/help/configure_links.html'
-                            ><i className='fa fa-phone'></i>Report a Problem</a></li>
+                        {helpLink}
+                        {reportLink}
                     </ul>
                 </div>
                 <UserSettingsModal

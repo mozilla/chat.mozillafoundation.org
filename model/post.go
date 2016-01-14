@@ -10,9 +10,11 @@ import (
 )
 
 const (
-	POST_DEFAULT          = ""
-	POST_SLACK_ATTACHMENT = "slack_attachment"
-	POST_JOIN_LEAVE       = "join_leave"
+	POST_SYSTEM_MESSAGE_PREFIX = "system_"
+	POST_DEFAULT               = ""
+	POST_SLACK_ATTACHMENT      = "slack_attachment"
+	POST_JOIN_LEAVE            = "system_join_leave"
+	POST_HEADER_CHANGE         = "system_header_change"
 )
 
 type Post struct {
@@ -104,12 +106,16 @@ func (o *Post) IsValid() *AppError {
 	}
 
 	// should be removed once more message types are supported
-	if !(o.Type == POST_DEFAULT || o.Type == POST_JOIN_LEAVE || o.Type == POST_SLACK_ATTACHMENT) {
+	if !(o.Type == POST_DEFAULT || o.Type == POST_JOIN_LEAVE || o.Type == POST_SLACK_ATTACHMENT || o.Type == POST_HEADER_CHANGE) {
 		return NewAppError("Post.IsValid", "Invalid type", "id="+o.Type)
 	}
 
 	if utf8.RuneCountInString(ArrayToJson(o.Filenames)) > 4000 {
 		return NewAppError("Post.IsValid", "Invalid filenames", "id="+o.Id)
+	}
+
+	if utf8.RuneCountInString(StringInterfaceToJson(o.Props)) > 8000 {
+		return NewAppError("Post.IsValid", "Invalid props", "id="+o.Id)
 	}
 
 	return nil
@@ -154,4 +160,8 @@ func (o *Post) AddProp(key string, value interface{}) {
 }
 
 func (o *Post) PreExport() {
+}
+
+func (o *Post) IsSystemMessage() bool {
+	return len(o.Type) >= len(POST_SYSTEM_MESSAGE_PREFIX) && o.Type[:len(POST_SYSTEM_MESSAGE_PREFIX)] == POST_SYSTEM_MESSAGE_PREFIX
 }

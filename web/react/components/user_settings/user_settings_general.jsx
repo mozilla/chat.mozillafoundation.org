@@ -1,16 +1,17 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const SettingItemMin = require('../setting_item_min.jsx');
-const SettingItemMax = require('../setting_item_max.jsx');
-const SettingPicture = require('../setting_picture.jsx');
+import SettingItemMin from '../setting_item_min.jsx';
+import SettingItemMax from '../setting_item_max.jsx';
+import SettingPicture from '../setting_picture.jsx';
 
-const UserStore = require('../../stores/user_store.jsx');
-const ErrorStore = require('../../stores/error_store.jsx');
+import UserStore from '../../stores/user_store.jsx';
+import ErrorStore from '../../stores/error_store.jsx';
 
-const Client = require('../../utils/client.jsx');
-const AsyncClient = require('../../utils/async_client.jsx');
-const Utils = require('../../utils/utils.jsx');
+import * as Client from '../../utils/client.jsx';
+import Constants from '../../utils/constants.jsx';
+import * as AsyncClient from '../../utils/async_client.jsx';
+import * as Utils from '../../utils/utils.jsx';
 
 export default class UserSettingsGeneralTab extends React.Component {
     constructor(props) {
@@ -51,7 +52,7 @@ export default class UserSettingsGeneralTab extends React.Component {
         }
 
         if (user.username === username) {
-            this.setState({clientError: 'You must submit a new username.', emailError: '', serverError: ''});
+            this.updateSection('');
             return;
         }
 
@@ -66,7 +67,7 @@ export default class UserSettingsGeneralTab extends React.Component {
         const nickname = this.state.nickname.trim();
 
         if (user.nickname === nickname) {
-            this.setState({clientError: 'You must submit a new nickname.', emailError: '', serverError: ''});
+            this.updateSection('');
             return;
         }
 
@@ -82,7 +83,7 @@ export default class UserSettingsGeneralTab extends React.Component {
         const lastName = this.state.lastName.trim();
 
         if (user.first_name === firstName && user.last_name === lastName) {
-            this.setState({clientError: 'You must submit a new first or last name.', emailError: '', serverError: ''});
+            this.updateSection('');
             return;
         }
 
@@ -98,10 +99,6 @@ export default class UserSettingsGeneralTab extends React.Component {
         const email = this.state.email.trim().toLowerCase();
         const confirmEmail = this.state.confirmEmail.trim().toLowerCase();
 
-        if (user.email === email) {
-            return;
-        }
-
         if (email === '' || !Utils.isEmail(email)) {
             this.setState({emailError: 'Please enter a valid email address.', clientError: '', serverError: ''});
             return;
@@ -109,6 +106,11 @@ export default class UserSettingsGeneralTab extends React.Component {
 
         if (email !== confirmEmail) {
             this.setState({emailError: 'The new emails you entered do not match.', clientError: '', serverError: ''});
+            return;
+        }
+
+        if (user.email === email) {
+            this.updateSection('');
             return;
         }
 
@@ -154,6 +156,9 @@ export default class UserSettingsGeneralTab extends React.Component {
 
         if (picture.type !== 'image/jpeg' && picture.type !== 'image/png') {
             this.setState({clientError: 'Only JPG or PNG images may be used for profile pictures.'});
+            return;
+        } else if (picture.size > Constants.MAX_FILE_SIZE) {
+            this.setState({clientError: 'Unable to upload profile image. File is too large.'});
             return;
         }
 
@@ -438,12 +443,12 @@ export default class UserSettingsGeneralTab extends React.Component {
         if (this.props.activeSection === 'email') {
             const emailEnabled = global.window.mm_config.SendEmailNotifications === 'true';
             const emailVerificationEnabled = global.window.mm_config.RequireEmailVerification === 'true';
-            let helpText = 'Email is used for notifications, and requires verification if changed.';
+            let helpText = 'Email is used for sign-in, notifications, and password reset. Email requires verification if changed.';
 
             if (!emailEnabled) {
                 helpText = <div className='setting-list__hint text-danger'>{'Email has been disabled by your system administrator. No notification emails will be sent until it is enabled.'}</div>;
             } else if (!emailVerificationEnabled) {
-                helpText = 'Email is used for notifications.';
+                helpText = 'Email is used for sign-in, notifications, and password reset.';
             } else if (this.state.emailChangeInProgress) {
                 const newEmail = UserStore.getCurrentUser().email;
                 if (newEmail) {

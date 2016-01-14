@@ -2,7 +2,8 @@
 
 ## Install Ubuntu Server (x64) 14.04 LTS
 1. Set up 3 machines with Ubuntu 14.04 with 2GB of RAM or more.  The servers will be used for the Load Balancer, Mattermost (this must be x64 to use pre-built binaries), and Database.
-1. Make sure the system is up to date with the most recent security patches.
+   - **Optional:** You can also use a single machine for all 3 components in this install guide, depending on the standards of your data center.
+2. Make sure the system is up to date with the most recent security patches.
   * ``` sudo apt-get update```
   * ``` sudo apt-get upgrade```
 
@@ -33,22 +34,25 @@
   * host    all             all             10.10.10.2/32         md5
 1. Reload Postgres database
   * ```sudo /etc/init.d/postgresql reload```
+1. Attempt to connect with the new created user to verify everything looks good
+  * ```psql --host=10.10.10.1 --dbname=mattermost --username=mmuser --password```
+  * ```mattermost=> \q```
 
 
 ## Set up Mattermost Server
 1. For the purposes of this guide we will assume this server has an IP address of 10.10.10.2
-1. Download the latest Mattermost Server by typing:
-  * ``` wget https://github.com/mattermost/platform/releases/download/v1.2.1/mattermost.tar.gz```
-1. Unzip the Mattermost Server by typing:
-  * ``` tar -xvzf mattermost.tar.gz```
 1. For the sake of making this guide simple we located the files at `/home/ubuntu/mattermost`. In the future we will give guidance for storing under `/opt`.
 1. We have also elected to run the Mattermost Server as the `ubuntu` account for simplicity.  We recommend setting up and running the service under a `mattermost` user account with limited permissions.
+1. Download the latest Mattermost Server by typing:
+  * ``` wget https://github.com/mattermost/platform/releases/download/v1.3.0/mattermost.tar.gz```
+1. Unzip the Mattermost Server by typing:
+  * ``` tar -xvzf mattermost.tar.gz```
 1. Create the storage directory for files.  We assume you will have attached a large drive for storage of images and files.  For this setup we will assume the directory is located at `/mattermost/data`.
   * Create the directory by typing:
   * ``` sudo mkdir -p /mattermost/data```
   * Set the ubuntu account as the directory owner by typing:
   * ``` sudo chown -R ubuntu /mattermost```
-1. Configure Mattermost Server by editing the config.json file at /home/ubuntu/mattermost/config`
+1. Configure Mattermost Server by editing the config.json file at `/home/ubuntu/mattermost/config`
   * ``` cd ~/mattermost/config```
   * Edit the file by typing:
   * ``` vi config.json```
@@ -61,7 +65,7 @@
   * ``` ./platform```
   * You should see a console log like `Server is listening on :8065` letting you know the service is running.
   * Stop the server for now by typing `ctrl-c`
-1. Setup Mattermost to use the Ubuntu Upstart daemon which handles supervision of the Mattermost process.
+1. Setup Mattermost to use the Upstart daemon which handles supervision of the Mattermost process.
   * ``` sudo touch /etc/init/mattermost.conf```
   * ``` sudo vi /etc/init/mattermost.conf```
   * Copy the following lines into `/etc/init/mattermost.conf`
@@ -72,7 +76,7 @@ respawn
 chdir /home/ubuntu/mattermost
 setuid ubuntu
 exec bin/platform
-```   
+```
   * You can manage the process by typing:
   * ``` sudo start mattermost```
   * Verify the service is running by typing:
@@ -101,21 +105,22 @@ exec bin/platform
   * Create a configuration for Mattermost
   * ``` sudo touch /etc/nginx/sites-available/mattermost```
   * Below is a sample configuration with the minimum settings required to configure Mattermost
- ```
+```
    server {
-	  server_name mattermost.example.com;
+      server_name mattermost.example.com;
+
       location / {
-		  client_max_body_size 50M;
-		  proxy_set_header Upgrade $http_upgrade;
-          proxy_set_header Connection "upgrade";
-		  proxy_set_header Host $http_host;
-		  proxy_set_header X-Real-IP $remote_addr;
-		  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-		  proxy_set_header X-Forwarded-Proto $scheme;
-		  proxy_set_header   X-Frame-Options   SAMEORIGIN;
-          proxy_pass http://10.10.10.2:8065;
+         client_max_body_size 50M;
+         proxy_set_header Upgrade $http_upgrade;
+         proxy_set_header Connection "upgrade";
+         proxy_set_header Host $http_host;
+         proxy_set_header X-Real-IP $remote_addr;
+         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+         proxy_set_header X-Forwarded-Proto $scheme;
+         proxy_set_header X-Frame-Options SAMEORIGIN;
+         proxy_pass http://10.10.10.2:8065;
       }
-    }
+   }
 ```
   * Remove the existing file with
   * ``` sudo rm /etc/nginx/sites-enabled/default```
@@ -147,31 +152,43 @@ exec bin/platform
 4. Modify the file at `/etc/nginx/sites-available/mattermost` and add the following lines:
 ```
   server {
-       listen         80;
-       server_name    mattermost.example.com;
-       return         301 https://$server_name$request_uri;
+     listen         80;
+     server_name    mattermost.example.com;
+     return         301 https://$server_name$request_uri;
   }
   
   server {
-        listen 443 ssl;
-        server_name mattermost.example.com;
-		
-        ssl on;
-        ssl_certificate /home/ubuntu/cert/mattermost.crt;
-        ssl_certificate_key /home/ubuntu/cert/mattermost.key;
-        ssl_dhparam /home/ubuntu/cert/dhparam.pem;
-        ssl_session_timeout 5m;
-        ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
-        ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
-        ssl_prefer_server_ciphers on;
-		
-		# add to location / above
-		location / {
-			gzip off;
-			proxy_set_header X-Forwarded-Ssl on;
-```
-## Finish Mattermost Server setup
+     listen 443 ssl;
+     server_name mattermost.example.com;
 
+     ssl on;
+     ssl_certificate /home/ubuntu/cert/mattermost.crt;
+     ssl_certificate_key /home/ubuntu/cert/mattermost.key;
+     ssl_dhparam /home/ubuntu/cert/dhparam.pem;
+     ssl_session_timeout 5m;
+     ssl_protocols TLSv1 TLSv1.1 TLSv1.2;
+     ssl_ciphers 'EECDH+AESGCM:EDH+AESGCM:AES256+EECDH:AES256+EDH';
+     ssl_prefer_server_ciphers on;
+     ssl_session_cache shared:SSL:10m;
+
+     location / {
+        gzip off;
+        proxy_set_header X-Forwarded-Ssl on;
+        client_max_body_size 50M;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $http_host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Frame-Options SAMEORIGIN;
+        proxy_pass http://10.10.10.2:8065;
+     }
+  }
+```
+
+
+## Finish Mattermost Server setup
 1. Navigate to https://mattermost.example.com and create a team and user.
 1. The first user in the system is automatically granted the `system_admin` role, which gives you access to the System Console.
 1. From the `town-square` channel click the dropdown and choose the `System Console` option

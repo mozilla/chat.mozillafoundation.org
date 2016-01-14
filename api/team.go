@@ -5,10 +5,11 @@ package api
 
 import (
 	"bytes"
-	l4g "code.google.com/p/log4go"
 	"fmt"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/gorilla/mux"
 	"github.com/mattermost/platform/model"
+	"github.com/mattermost/platform/store"
 	"github.com/mattermost/platform/utils"
 	"net/http"
 	"net/url"
@@ -221,8 +222,9 @@ func createTeamFromSignup(c *Context, w http.ResponseWriter, r *http.Request) {
 		teamSignup.User.TeamId = rteam.Id
 		teamSignup.User.EmailVerified = true
 
-		ruser := CreateUser(c, rteam, &teamSignup.User)
-		if c.Err != nil {
+		ruser, err := CreateUser(rteam, &teamSignup.User)
+		if err != nil {
+			c.Err = err
 			return
 		}
 
@@ -479,7 +481,7 @@ func inviteMembers(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	var invNum int64 = 0
 	for i, invite := range invites.Invites {
-		if result := <-Srv.Store.User().GetByEmail(c.Session.TeamId, invite["email"]); result.Err == nil || result.Err.Message != "We couldn't find the existing account" {
+		if result := <-Srv.Store.User().GetByEmail(c.Session.TeamId, invite["email"]); result.Err == nil || result.Err.Message != store.MISSING_ACCOUNT_ERROR {
 			invNum = int64(i)
 			c.Err = model.NewAppError("invite_members", "This person is already on your team", strconv.FormatInt(invNum, 10))
 			return
@@ -514,6 +516,7 @@ func InviteMembers(c *Context, team *model.Team, user *model.User, invites []str
 			subjectPage.Props["TeamDisplayName"] = team.DisplayName
 
 			bodyPage := NewServerTemplatePage("invite_body")
+			bodyPage.Props["SiteURL"] = c.GetSiteURL()
 			bodyPage.Props["TeamURL"] = c.GetTeamURL()
 			bodyPage.Props["TeamDisplayName"] = team.DisplayName
 			bodyPage.Props["SenderName"] = sender
@@ -580,6 +583,39 @@ func updateTeam(c *Context, w http.ResponseWriter, r *http.Request) {
 	oldTeam.Sanitize()
 
 	w.Write([]byte(oldTeam.ToJson()))
+}
+
+func PermanentDeleteTeam(c *Context, team *model.Team) *model.AppError {
+	l4g.Warn("Attempting to permanently delete team %v id=%v", team.Name, team.Id)
+	c.Path = "/teams/permanent_delete"
+	c.LogAuditWithUserId("", fmt.Sprintf("attempt teamId=%v", team.Id))
+
+	team.DeleteAt = model.GetMillis()
+	if result := <-Srv.Store.Team().Update(team); result.Err != nil {
+		return result.Err
+	}
+
+	if result := <-Srv.Store.User().GetForExport(team.Id); result.Err != nil {
+		return result.Err
+	} else {
+		users := result.Data.([]*model.User)
+		for _, user := range users {
+			PermanentDeleteUser(c, user)
+		}
+	}
+
+	if result := <-Srv.Store.Channel().PermanentDeleteByTeam(team.Id); result.Err != nil {
+		return result.Err
+	}
+
+	if result := <-Srv.Store.Team().PermanentDelete(team.Id); result.Err != nil {
+		return result.Err
+	}
+
+	l4g.Warn("Permanently deleted team %v id=%v", team.Name, team.Id)
+	c.LogAuditWithUserId("", fmt.Sprintf("success teamId=%v", team.Id))
+
+	return nil
 }
 
 func getMyTeam(c *Context, w http.ResponseWriter, r *http.Request) {

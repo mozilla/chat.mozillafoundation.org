@@ -1,8 +1,260 @@
 # Mattermost Changelog
 
-## Release v1.2.0
+## Release v1.4.0
 
-- **Final release anticipated:** 2015-11-16
+Expected Release date: 2016-01-16
+
+### Release Highlights
+
+#### Data Center Support 
+
+- Deployment guides on Red Hat Enterprise Linux 6 and 7 now available 
+- Legal disclosure and support links (terms of service, privacy policy, help, about, and support email) now configurable
+- Over a dozen new configuration options in System Console
+
+#### Mobile Experience
+
+- iOS reference app [now available from iTunes](https://itunes.apple.com/us/app/mattermost/id984966508?ls=1&mt=8), compiled from [open source repo](https://github.com/mattermost/ios)
+- Date headers now show when scrolling on mobile, so you can quickly see when messages were sent
+- Added "rapid scroll" support for jumping quickily to bottom of channels on mobile 
+
+### New Features
+
+Mobile Experience
+- Date headers now show when scrolling on mobile, so you can quickly see when messages were sent
+- Added "rapid scroll" support for jumping quickily to bottom of channels on mobile 
+
+Authentication
+
+- Accounts can now switch between email and GitLab SSO sign-in options 
+- New ability to customize session token length 
+
+System Console
+
+- Added **Legal and Support Settings** so System Administrators can change the default Terms of Service, Privacy Policy, and Help links
+- Under **Service Settings** added options to customize expiry of web, mobile and SSO session tokens, expiry of caches in memory, and an EnableDeveloper option to turn on Developer Mode which alerts users to any console errors that occur
+
+### Improvements 
+
+Performance and Testing
+
+- Added logging for email and push notifications events in DEBUG mode 
+
+Integrations
+
+- Added support to allow optional parameters in the `Content-Type` of incoming webhook requests
+
+Files and Images
+
+- Animated GIFs autoplay in the image previewer
+
+Notifications and Email
+
+- Changed email notifications to display the server's local timezone instead of UTC
+
+User Interface
+
+- Updated the "About Mattermost" dialog formatting
+- Going to domain/teamname now goes to the last channel of your previous session, instead of Town Square
+- Various improvements to mobile UI, including a floating date indicator and the ability to quickly scroll to the bottom of the channel
+
+#### Bug Fixes  
+
+- Fixed issue where usernames containing a "." did not get mention notifications
+- Fixed issue where System Console did not save the "Send push notifications" setting
+- Fixed issue with Font Display cancel button not working in Account Settings menu
+- Fixed incorrect default for "Team Name Display" settings
+- Fixed issue where various media files appeared broken in the media player on some browsers 
+- Fixed cross-contamination issue when multiple accounts log into the same team on the same browser
+- Fixed issue where color pickers did not update when a theme was pasted in
+- Increased the maximum number of channels
+
+### Compatibility  
+
+#### Config.json Changes from v1.3 to v1.4
+
+Multiple settings were added to `config.json`. Below is a list of the changes and their new default values in a fresh install. 
+
+The following options can be modified in the System Console:  
+
+- Under `ServiceSettings` in `config.json`:
+  - Added: `"EnableDeveloper": false` to set whether developer mode is enabled, which alerts users to any console errors that occur
+  - Added: `"SessionLengthWebInDays" : 30` to set the number of days before web sessions expire and users will need to log in again
+  - Added: `"SessionLengthMobileInDays" : 30` to set the number of days before native mobile sessions expire
+  - Added: `"SessionLengthSSOInDays" : 30` to set the number of days before  SSO sessions expire
+  - Added: `"SessionCacheInMinutes" : 10` to set the number of minutes to cache a session in memory
+- Added `SupportSettings` section to `config.json`:
+  - Added: `"TermsOfServiceLink": "/static/help/terms.html"` to allow System Administrators to set the terms of service link
+  - Added: `"PrivacyPolicyLink": "/static/help/privacy.html"` to allow System Administrators to set the privacy policy link
+  - Added: `"AboutLink": "/static/help/about.html"` to allow System Administrators to set the about page link
+  - Added: `"HelpLink": "/static/help/help.html"` to allow System Administrators to set the help page link
+  - Added: `"ReportAProblemLink": "/static/help/report_problem.html"` to allow System Administrators to set the home page for the support website
+  - Added: `"SupportEmail":"feedback@mattermost.com"` to allow System Administrators to set an email address for feedback and support requests
+
+The following options are not present in the System Console, and can be modified manually in the `config.json` file:  
+
+- Under `FileSettings` in `config.json`:
+  - Added: `"AmazonS3Endpoint": ""` to set an endpoint URL for an Amazon S3 instance
+  - Added: `"AmazonS3BucketEndpoint": ""` to set an endpoint URL for Amazon S3 buckets
+  - Added: `"AmazonS3LocationConstraint": false` to set whether the S3 region is location constrained
+  - Added: `"AmazonS3LowercaseBucket": false` to set whether bucket names are fully lowercase or not
+
+#### Known Issues
+
+- When navigating to a page with new messages as well as message containing inline images added via markdown, the channel may move up and down while loading the inline images
+- Microsoft Edge does not yet support drag and drop 
+- No scroll bar in center channel
+- Pasting images into text box fails to upload on Firefox, Safari, and IE11
+- Public links for attachments attempt to download the file on IE, Edge, and Safari
+- Importing from Slack breaks @mentions and fails to load in certain cases with comments on files 
+- System Console > TEAMS > Statistics > Newly Created Users shows all of the users are created "just now"
+- Favicon does not always become red when @mentions and direct messages are received on an inactive browser tab
+- Searching for a phrase in quotations returns more than just the phrase on Mattermost installations with a Postgres database
+- Deleted/Archived channels are not removed from the "More" menu of the person that deleted/archived the channel until after refresh
+- Search results don't highlight searches for @username, non-latin characters, or terms inside Markdown code blocks
+- Searching for a username or hashtag containing a dot returns a search where the dot is replaced with the "or" operator 
+- Hashtags less than three characters long are not searchable
+- After deactivating a team member, the person remains in the channel counter
+- Certain symbols (<,>,-,+,=,%,^,#,*,|) directly before or after a hashtag cause the message to not show up in a hashtag search
+- Security tab > Active Sessions reports iOS devices as "unknown"
+- Getting a permalink for the second message or later consecutively sent in a group by the same author displaces the copy link popover or causes an error
+
+#### Contributors 
+
+Many thanks to our external contributors. In no particular order:
+
+- [npcode](https://github.com/npcode)
+- [hjf288](https://github.com/hjf288)
+- [apskim](https://github.com/apskim)
+- [ejm2172](https://github.com/ejm2172)
+- [hvnsweeting](https://github.com/hvnsweeting)
+- [benburkert](https://github.com/benburkert)
+- [erikthered](https://github.com/erikthered)
+
+## Release v1.3.0
+
+Release date: 2015-12-16
+
+### Release Highlights
+
+#### iOS App
+
+- New [Mattermost iOS App](https://github.com/mattermost/ios) now available for iPhone, iPad, and iPod Touch
+- New [Mattermost Push Notification Service](https://github.com/mattermost/push-proxy) to relay notifications to custom iOS applications
+
+#### Search Upgrades
+
+- Jump to search results in archives using new message permalinks 
+- It's easier to find what you're looking for with improved auto-complete in search
+
+#### Advanced Formatting
+
+- Express more in symbols, with new emoji auto-complete
+- Express more in numbers, with rendering of mathematical expressions using Latex (start code blocks with ```latex)
+- Personalize your look with new custom font settings under **Account Settings** > **Display** > **Display Font**
+
+### New Features
+
+Authentication
+- Added unofficial SSO support for GitHub.com and GitHub Enterprise using GitLab UI
+
+Archives
+- Added permalink feature that lets users link to a post in the message archives
+- Added ability to "Jump" to archives from a search result
+
+Account Settings
+- Added "Preview pre-release features" setting, to allow user to preview early features ahead of their official release
+- Added "Display font" setting, so users can select which font to use
+
+Messaging & Comments
+- Added in-line previews for links from select websites and for URLs pointing to an image (enabled via Account Settings -> Advanced -> Preview pre-release features)
+- Added emoji autocomplete
+
+Extras
+- Added `/loadtest url` tool for manually [testing text processing](https://github.com/mattermost/platform/tree/master/doc/developer/tests)
+
+### Improvements 
+
+Performance
+- Updated getProfiles service to return less data
+- Refactored several modals to use React-Boostrap
+- Refactored the center channel
+
+Messaging & Comments
+- Added Markdown support for task lists
+- Added "Help" link for messaging
+- Added ability to preview a Markdown message before sending (enabled via Account Settings -> Advanced -> Preview pre-release features)
+
+Onboarding
+- Minor upgrades to tutorial 
+
+User Interface
+- Visually combined sequential messages from the same user 
+- Added ability to rename "Town Square"
+- Teammate name display option now applies to messages and comments
+- Menus and search improved on mobile UI
+- Switched to Emoji One style emojis
+
+#### Bug Fixes  
+
+- Removed the @all mention to keep users from accidentally spamming team sites
+- Fixed bug where the member list only showed "20" members for channels with more than 20 members
+- Fixed bug where the channel sidebar didn't order correctly on Postgres databases
+- Fixed bug where search results did not highlight when searching with quotation marks, wildcard, or in: and from: modifiers
+- Fixed bug with the cancel button not properly resetting the text in some account settings fields
+- Fixed bug where editing a post to be empty caused a 404 error
+- Fixed bug where logging out did not work properly on IE11
+- Fixed issue where refreshing the page with the right hand sidebar open caused "..." to show up in place of usernames
+- Fixed issue where invite to channel modal did not update properly when switching between channels
+
+### Compatibility  
+
+#### Config.json Changes from v1.2 to v1.3
+
+Multiple settings were added to [`config.json`](./config/config.json). These options can be modified in the System Console, or manually updated in the existing config.json file. This is a list of changes and their new default values in a fresh install: 
+- Under `EmailSettings` in `config.json`:
+  - Removed: `"ApplePushServer": ""` which is replaced with `SendPushNotifications` and `PushNotificationServer`
+  - Removed: `"ApplePushCertPublic": ""`  which is replaced with `SendPushNotifications` and `PushNotificationServer`
+  - Removed: `"ApplePushCertPrivate": ""` which is replaced with `SendPushNotifications` and `PushNotificationServer`
+  - Added: `"SendPushNotifications": false` to control whether mobile push notifications are sent to the server specified in `PushNotificationServer`
+  - Added: `"PushNotificationServer": ""` to specify the address of the proxy server that re-sends push notifications to their respective services like APNS (Apple Push Notification Services)
+
+#### Known Issues
+
+- System Console does not save Email Settings when "Save" is clicked
+- When navigating to a page with new messages as well as message containing inline images added via markdown, the channel may move up and down while loading the inline images
+- Microsoft Edge does not yet support drag and drop 
+- Media files of type .avi .mkv .wmv .mov .flv .mp4a do not play  properly
+- No scroll bar in center channel
+- Pasting images into text box fails to upload on Firefox, Safari, and IE11
+- Slack import @mentions break
+- Usernames containing a "." do not get mention notifications
+
+#### Contributors 
+
+Many thanks to our external contributors. In no particular order:
+
+- [florianorben](https://github.com/florianorben)
+- [npcode](https://github.com/npcode)
+- [42wim](https://github.com/42wim)
+- [cifvts](https://github.com/cifvts)
+- [rompic](https://github.com/rompic)
+- [jdhoek](https://github.com/jdhoek)
+- [Tsynapse](https://github.com/Tsynapse)
+- [alexgaribay](https://github.com/alexgaribay)
+- [vladikoff](https://github.com/vladikoff)
+- [jonathanwiesel](https://github.com/jonathanwiesel)
+- [tamtamchik](https://github.com/tamtamchik)
+
+## Release v1.2.1
+
+- **Released:** 2015-11-16
+
+### Security Notice
+
+Mattermost v1.2.1 is a bug fix release addressing a security issue in v1.2.0 affecting a newly introduced outgoing webhooks feature. Specifically, in v1.2.0 there was a check missing from outgoing webhooks, so a team member creating outgoing webhooks could in theory find a way to listen to messages in private channels containing popular words like "a", "the", "at", etc. For added security, Mattermost v1.2.1 now installs with incoming and outgoing webhooks disabled by default. 
+
+To limit the impact of this security issue, Mattermost v1.2.0 has been removed from the source repo. It is recommended that anyone who's installed v1.2.0 upgrade to v1.2.1 via [the procedure described in the Mattermost Upgrade Guide](https://github.com/mattermost/platform/blob/master/doc/install/Upgrade-Guide.md). 
 
 ### Release Highlights
 
@@ -10,7 +262,7 @@
 
 - Mattermost users can now interact with external applications using [outgoing webhooks](https://github.com/mattermost/platform/blob/master/doc/integrations/webhooks/Outgoing-Webhooks.md)
 - An [application template](https://github.com/mattermost/mattermost-integration-giphy) demonstrating user queries sent to the Giphy search engine via Mattermost webhooks now available
-- A community application, [Matterbrige](https://github.com/42wim/matterbridge?files=1), shows how to use webhooks to connect Mattermost with IRC 
+- A community application, [Matterbridge](https://github.com/42wim/matterbridge?files=1), shows how to use webhooks to connect Mattermost with IRC 
 
 #### Search Scope Modifiers 
 
@@ -19,7 +271,7 @@
 
 #### Syntax Highlighting 
 
-- Syntax highlight for code blocks now available for `Diff, Apache, Makefile, HTTP, JSON, Markdown, Java, CSS, nginx, ObjectiveC, Python, XML, Perl, Bash, PHP, Coffee, C, SQL, Go, Ruby, Java, and ini`
+- Syntax highlight for code blocks now available for `Diff, Apache, Makefile, HTTP, JSON, Markdown, JavaScript, CSS, nginx, ObjectiveC, Python, XML, Perl, Bash, PHP, CoffeeScript, C, SQL, Go, Ruby, Java, and ini`
 
 #### Usability Improvements 
 
@@ -56,7 +308,7 @@ User Interface
 - Member list in Channel display now scrollable, and includes Message button to message channel members directly
 - Added ability to edit previous message by hitting UP arrow 
 - Syntax highlighting added for code blocks 
-   - Languages include `Diff, Apache, Makefile, HTTP, JSON, Markdown, Java, CSS, nginx, ObjectiveC, Python, XML, Perl, Bash, PHP, Coffee, C, SQL, Go, Ruby, Java, and ini`. 
+   - Languages include `Diff, Apache, Makefile, HTTP, JSON, Markdown, Java, CSS, nginx, ObjectiveC, Python, XML, Perl, Bash, PHP, CoffeeScript, C, SQL, Go, Ruby, Java, and ini`. 
    - Use by adding the name of the language on the first link of the code block, for example: ```python
    - Syntax color theme can be defined under **Account Settings** > **Appearance Settings** > **Custom Theme**
 - Updated Drag & Drop UI
@@ -79,13 +331,14 @@ System Console
 - New statistics page
 - Configurable option to create an account directly from team page
 
-#### Bug Fixes
+#### Bug Fixes  
 
 - Various fixes to theme colors
 - Fixed issue with the centre channel scroll position jumping when right hand side was opened and closed
 - Added support for simultaneous login to different teams in different browser tabs
 - Incoming webhooks no longer disrupted when channel is deleted
 - You can now paste a Mattermost incoming webhook URL into the same field designed for a Slack URL and integrations will work 
+
 ### Compatibility  
 
 - IE 11 new minimum version for IE, since IE 10 share fell below 5% on desktop 
@@ -98,7 +351,8 @@ Multiple settings were added to [`config.json`](./config/config.json). These opt
   - Added: `"RestrictTeamNames": true` to control whether team names can contain reserved words like www, admin, support, test, etc.
   - Added: `"EnableTeamListing": false` to control whether teams can be listed on the root page of the site
 - Under `ServiceSettings` in `config.json`
-  - Added: `EnableOutgoingWebhooks": false` to control whether outgoing webhooks are enabled
+  - Added: `"EnableOutgoingWebhooks": false` to control whether outgoing webhooks are enabled
+  - Changed: `"EnableIncomingWebhooks": true` to `"EnableIncomingWebhooks": false` to turn incoming webhooks off by default, to increase security of default install. Documentation updated to enable webhooks before use. 
 
 #### Database Changes from v1.1 to v1.2
 
@@ -152,6 +406,10 @@ Many thanks to our external contributors. In no particular order:
 - [vinnymac](https://github.com/vinnymac)
 - [yuvipanda](https://github.com/yuvipanda)
 - [toyorg](https://github.com/toyorg)
+
+## Release v1.2.0 (Redacted Release)
+
+- **Final release:** 2015-11-16 (**Note:** This release was removed from public availability and replaced by v1.2.1 owing to a security issue with the new outgoing webhooks feature. See v1.2.1 Release Notes for details).
 
 ## Release v1.1.1 (Bug Fix Release) 
 

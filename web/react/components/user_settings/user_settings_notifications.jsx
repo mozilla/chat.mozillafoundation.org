@@ -1,14 +1,14 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const SettingItemMin = require('../setting_item_min.jsx');
-const SettingItemMax = require('../setting_item_max.jsx');
+import SettingItemMin from '../setting_item_min.jsx';
+import SettingItemMax from '../setting_item_max.jsx';
 
-const UserStore = require('../../stores/user_store.jsx');
+import UserStore from '../../stores/user_store.jsx';
 
-const Client = require('../../utils/client.jsx');
-const AsyncClient = require('../../utils/async_client.jsx');
-const Utils = require('../../utils/utils.jsx');
+import * as Client from '../../utils/client.jsx';
+import * as AsyncClient from '../../utils/async_client.jsx';
+import * as Utils from '../../utils/utils.jsx';
 
 function getNotificationsStateFromStores() {
     var user = UserStore.getCurrentUser();
@@ -78,7 +78,9 @@ export default class NotificationsTab extends React.Component {
         super(props);
 
         this.handleSubmit = this.handleSubmit.bind(this);
+        this.handleCancel = this.handleCancel.bind(this);
         this.updateSection = this.updateSection.bind(this);
+        this.updateState = this.updateState.bind(this);
         this.onListenerChange = this.onListenerChange.bind(this);
         this.handleNotifyRadio = this.handleNotifyRadio.bind(this);
         this.handleEmailRadio = this.handleEmailRadio.bind(this);
@@ -128,9 +130,20 @@ export default class NotificationsTab extends React.Component {
             }.bind(this)
         );
     }
+    handleCancel(e) {
+        this.updateState();
+        this.props.updateSection('');
+        e.preventDefault();
+    }
     updateSection(section) {
-        this.setState(getNotificationsStateFromStores());
+        this.updateState();
         this.props.updateSection(section);
+    }
+    updateState() {
+        const newState = getNotificationsStateFromStores();
+        if (!Utils.areObjectsEqual(newState, this.state)) {
+            this.setState(newState);
+        }
     }
     componentDidMount() {
         UserStore.addChangeListener(this.onListenerChange);
@@ -139,10 +152,7 @@ export default class NotificationsTab extends React.Component {
         UserStore.removeChangeListener(this.onListenerChange);
     }
     onListenerChange() {
-        var newState = getNotificationsStateFromStores();
-        if (!Utils.areObjectsEqual(newState, this.state)) {
-            this.setState(newState);
-        }
+        this.updateState();
     }
     handleNotifyRadio(notifyLevel) {
         this.setState({notifyLevel: notifyLevel});
@@ -245,11 +255,6 @@ export default class NotificationsTab extends React.Component {
                 </div>
             );
 
-            handleUpdateDesktopSection = function updateDesktopSection(e) {
-                this.props.updateSection('');
-                e.preventDefault();
-            }.bind(this);
-
             const extraInfo = <span>{'Desktop notifications are available on Firefox, Safari, and Chrome.'}</span>;
 
             desktopSection = (
@@ -259,7 +264,7 @@ export default class NotificationsTab extends React.Component {
                     inputs={inputs}
                     submit={this.handleSubmit}
                     server_error={serverError}
-                    updateSection={handleUpdateDesktopSection}
+                    updateSection={this.handleCancel}
                 />
             );
         } else {
@@ -324,11 +329,6 @@ export default class NotificationsTab extends React.Component {
                  </div>
             );
 
-            handleUpdateSoundSection = function updateSoundSection(e) {
-                this.props.updateSection('');
-                e.preventDefault();
-            }.bind(this);
-
             const extraInfo = <span>{'Desktop notification sounds are available on Firefox, Safari, Chrome, Internet Explorer, and Edge.'}</span>;
 
             soundSection = (
@@ -338,7 +338,7 @@ export default class NotificationsTab extends React.Component {
                     inputs={inputs}
                     submit={this.handleSubmit}
                     server_error={serverError}
-                    updateSection={handleUpdateSoundSection}
+                    updateSection={this.handleCancel}
                 />
             );
         } else {
@@ -405,18 +405,13 @@ export default class NotificationsTab extends React.Component {
                 </div>
             );
 
-            handleUpdateEmailSection = function updateEmailSection(e) {
-                this.props.updateSection('');
-                e.preventDefault();
-            }.bind(this);
-
             emailSection = (
                 <SettingItemMax
                     title='Email notifications'
                     inputs={inputs}
                     submit={this.handleSubmit}
                     server_error={serverError}
-                    updateSection={handleUpdateEmailSection}
+                    updateSection={this.handleCancel}
                 />
             );
         } else {
@@ -512,7 +507,7 @@ export default class NotificationsTab extends React.Component {
             }.bind(this);
             inputs.push(
                 <div key='userNotificationAllOption'>
-                    <div className='checkbox'>
+                    <div className='checkbox hidden'>
                         <label>
                             <input
                                 type='checkbox'
@@ -566,17 +561,13 @@ export default class NotificationsTab extends React.Component {
                 </div>
             );
 
-            handleUpdateKeysSection = function updateKeysSection(e) {
-                this.props.updateSection('');
-                e.preventDefault();
-            }.bind(this);
             keysSection = (
                 <SettingItemMax
                     title='Words that trigger mentions'
                     inputs={inputs}
                     submit={this.handleSubmit}
                     server_error={serverError}
-                    updateSection={handleUpdateKeysSection}
+                    updateSection={this.handleCancel}
                 />
             );
         } else {
@@ -590,9 +581,11 @@ export default class NotificationsTab extends React.Component {
             if (this.state.mentionKey) {
                 keys.push('@' + user.username);
             }
-            if (this.state.allKey) {
-                keys.push('@all');
-            }
+
+            // if (this.state.allKey) {
+            //     keys.push('@all');
+            // }
+
             if (this.state.channelKey) {
                 keys.push('@channel');
             }
@@ -651,7 +644,7 @@ export default class NotificationsTab extends React.Component {
                     ref='wrapper'
                     className='user-settings'
                 >
-                    <h3 className='tab-header'>Notifications</h3>
+                    <h3 className='tab-header'>{'Notifications'}</h3>
                     <div className='divider-dark first'/>
                     {desktopSection}
                     <div className='divider-light'/>

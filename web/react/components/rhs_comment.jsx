@@ -1,19 +1,20 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var PostStore = require('../stores/post_store.jsx');
-var ChannelStore = require('../stores/channel_store.jsx');
-var UserProfile = require('./user_profile.jsx');
-var UserStore = require('../stores/user_store.jsx');
-var AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
-var Utils = require('../utils/utils.jsx');
-var Constants = require('../utils/constants.jsx');
-var FileAttachmentList = require('./file_attachment_list.jsx');
-var Client = require('../utils/client.jsx');
-var AsyncClient = require('../utils/async_client.jsx');
+import PostStore from '../stores/post_store.jsx';
+import ChannelStore from '../stores/channel_store.jsx';
+import UserProfile from './user_profile.jsx';
+import UserStore from '../stores/user_store.jsx';
+import AppDispatcher from '../dispatcher/app_dispatcher.jsx';
+import * as Utils from '../utils/utils.jsx';
+import Constants from '../utils/constants.jsx';
+import FileAttachmentList from './file_attachment_list.jsx';
+import * as Client from '../utils/client.jsx';
+import * as AsyncClient from '../utils/async_client.jsx';
 var ActionTypes = Constants.ActionTypes;
-var TextFormatting = require('../utils/text_formatting.jsx');
-var twemoji = require('twemoji');
+import * as TextFormatting from '../utils/text_formatting.jsx';
+import twemoji from 'twemoji';
+import * as EventHelpers from '../dispatcher/event_helpers.jsx';
 
 export default class RhsComment extends React.Component {
     constructor(props) {
@@ -114,12 +115,7 @@ export default class RhsComment extends React.Component {
                     <a
                         href='#'
                         role='menuitem'
-                        data-toggle='modal'
-                        data-target='#delete_post'
-                        data-title='Comment'
-                        data-postid={post.id}
-                        data-channelid={post.channel_id}
-                        data-comments={0}
+                        onClick={() => EventHelpers.showDeletePostModal(post, 0)}
                     >
                         {'Delete'}
                     </a>
@@ -135,7 +131,7 @@ export default class RhsComment extends React.Component {
             <div className='dropdown'>
                 <a
                     href='#'
-                    className='dropdown-toggle theme'
+                    className='post__dropdown dropdown-toggle'
                     type='button'
                     data-toggle='dropdown'
                     aria-expanded='false'
@@ -197,38 +193,39 @@ export default class RhsComment extends React.Component {
 
         return (
             <div className={'post ' + currentUserCss}>
-                <div className='post-profile-img__container'>
-                    <img
-                        className='post-profile-img'
-                        src={'/api/v1/users/' + post.user_id + '/image?time=' + timestamp + '&' + Utils.getSessionIndex()}
-                        height='36'
-                        width='36'
-                    />
-                </div>
                 <div className='post__content'>
-                    <ul className='post-header'>
-                        <li className='post-header-col'>
-                            <strong><UserProfile userId={post.user_id} /></strong>
-                        </li>
-                        <li className='post-header-col'>
-                            <time className='post-profile-time'>
-                                {Utils.displayCommentDateTime(post.create_at)}
-                            </time>
-                        </li>
-                        <li className='post-header-col post-header__reply'>
-                            {dropdown}
-                        </li>
-                    </ul>
-                    <div className='post-body'>
-                        <div className={postClass}>
-                            {loading}
-                            <div
-                                ref='message_holder'
-                                onClick={TextFormatting.handleClick}
-                                dangerouslySetInnerHTML={{__html: TextFormatting.formatText(post.message)}}
-                            />
+                    <div className='post__img'>
+                        <img
+                            src={'/api/v1/users/' + post.user_id + '/image?time=' + timestamp + '&' + Utils.getSessionIndex()}
+                            height='36'
+                            width='36'
+                        />
+                    </div>
+                    <div>
+                        <ul className='post__header'>
+                            <li className='col__name'>
+                                <strong><UserProfile userId={post.user_id} /></strong>
+                            </li>
+                            <li className='col'>
+                                <time className='post__time'>
+                                    {Utils.displayCommentDateTime(post.create_at)}
+                                </time>
+                            </li>
+                            <li className='col col__reply'>
+                                {dropdown}
+                            </li>
+                        </ul>
+                        <div className='post__body'>
+                            <div className={postClass}>
+                                {loading}
+                                <div
+                                    ref='message_holder'
+                                    onClick={TextFormatting.handleClick}
+                                    dangerouslySetInnerHTML={{__html: TextFormatting.formatText(post.message)}}
+                                />
+                            </div>
+                            {fileAttachment}
                         </div>
-                        {fileAttachment}
                     </div>
                 </div>
             </div>

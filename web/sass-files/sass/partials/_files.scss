@@ -1,6 +1,8 @@
+@charset "UTF-8";
+
 .preview-container {
   position: relative;
-  margin-top: 25px;
+  margin: 1px 0 10px;
   width: 100%;
   max-height: 100px;
   height: 100px;
@@ -254,4 +256,9 @@
     &.stop {
         @include opacity(0);
     }
+}
+
+.view-image__loading {
+    background: black;
+    min-height: 100px;
 }

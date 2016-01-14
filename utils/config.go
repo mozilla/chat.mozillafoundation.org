@@ -11,7 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 
-	l4g "code.google.com/p/log4go"
+	l4g "github.com/alecthomas/log4go"
 
 	"github.com/mattermost/platform/model"
 )
@@ -24,10 +24,10 @@ const (
 )
 
 var Cfg *model.Config = &model.Config{}
+var CfgDiagnosticId = ""
 var CfgLastModified int64 = 0
 var CfgFileName string = ""
 var ClientCfg map[string]string = map[string]string{}
-var SanitizeOptions map[string]bool = map[string]bool{}
 
 func FindConfigFile(fileName string) string {
 	if _, err := os.Stat("/tmp/" + fileName); err == nil {
@@ -59,8 +59,7 @@ func FindDir(dir string) string {
 func ConfigureCmdLineLog() {
 	ls := model.LogSettings{}
 	ls.EnableConsole = true
-	ls.ConsoleLevel = "ERROR"
-	ls.EnableFile = false
+	ls.ConsoleLevel = "WARN"
 	configureLog(&ls)
 }
 
@@ -72,11 +71,15 @@ func configureLog(s *model.LogSettings) {
 		level := l4g.DEBUG
 		if s.ConsoleLevel == "INFO" {
 			level = l4g.INFO
+		} else if s.ConsoleLevel == "WARN" {
+			level = l4g.WARNING
 		} else if s.ConsoleLevel == "ERROR" {
 			level = l4g.ERROR
 		}
 
-		l4g.AddFilter("stdout", level, l4g.NewConsoleLogWriter())
+		lw := l4g.NewConsoleLogWriter()
+		lw.SetFormat("[%D %T] [%L] %M")
+		l4g.AddFilter("stdout", level, lw)
 	}
 
 	if s.EnableFile {
@@ -90,6 +93,8 @@ func configureLog(s *model.LogSettings) {
 		level := l4g.DEBUG
 		if s.FileLevel == "INFO" {
 			level = l4g.INFO
+		} else if s.FileLevel == "WARN" {
+			level = l4g.WARNING
 		} else if s.FileLevel == "ERROR" {
 			level = l4g.ERROR
 		}
@@ -167,16 +172,7 @@ func LoadConfig(fileName string) {
 	}
 
 	Cfg = &config
-	SanitizeOptions = getSanitizeOptions(Cfg)
 	ClientCfg = getClientConfig(Cfg)
-}
-
-func getSanitizeOptions(c *model.Config) map[string]bool {
-	options := map[string]bool{}
-	options["fullname"] = c.PrivacySettings.ShowFullName
-	options["email"] = c.PrivacySettings.ShowEmailAddress
-
-	return options
 }
 
 func getClientConfig(c *model.Config) map[string]string {
@@ -186,9 +182,11 @@ func getClientConfig(c *model.Config) map[string]string {
 	props["BuildNumber"] = model.BuildNumber
 	props["BuildDate"] = model.BuildDate
 	props["BuildHash"] = model.BuildHash
+	props["BuildEnterpriseReady"] = model.BuildEnterpriseReady
 
 	props["SiteName"] = c.TeamSettings.SiteName
 	props["EnableTeamCreation"] = strconv.FormatBool(c.TeamSettings.EnableTeamCreation)
+	props["EnableUserCreation"] = strconv.FormatBool(c.TeamSettings.EnableUserCreation)
 	props["RestrictTeamNames"] = strconv.FormatBool(*c.TeamSettings.RestrictTeamNames)
 	props["EnableTeamListing"] = strconv.FormatBool(*c.TeamSettings.EnableTeamListing)
 
@@ -200,6 +198,7 @@ func getClientConfig(c *model.Config) map[string]string {
 	props["EnableOutgoingWebhooks"] = strconv.FormatBool(c.ServiceSettings.EnableOutgoingWebhooks)
 	props["EnablePostUsernameOverride"] = strconv.FormatBool(c.ServiceSettings.EnablePostUsernameOverride)
 	props["EnablePostIconOverride"] = strconv.FormatBool(c.ServiceSettings.EnablePostIconOverride)
+	props["EnableDeveloper"] = strconv.FormatBool(*c.ServiceSettings.EnableDeveloper)
 
 	props["SendEmailNotifications"] = strconv.FormatBool(c.EmailSettings.SendEmailNotifications)
 	props["EnableSignUpWithEmail"] = strconv.FormatBool(c.EmailSettings.EnableSignUpWithEmail)
@@ -207,12 +206,22 @@ func getClientConfig(c *model.Config) map[string]string {
 	props["FeedbackEmail"] = c.EmailSettings.FeedbackEmail
 
 	props["EnableSignUpWithGitLab"] = strconv.FormatBool(c.GitLabSettings.Enable)
+	props["EnableSignUpWithGoogle"] = strconv.FormatBool(c.GoogleSettings.Enable)
 
 	props["ShowEmailAddress"] = strconv.FormatBool(c.PrivacySettings.ShowEmailAddress)
+
+	props["TermsOfServiceLink"] = *c.SupportSettings.TermsOfServiceLink
+	props["PrivacyPolicyLink"] = *c.SupportSettings.PrivacyPolicyLink
+	props["AboutLink"] = *c.SupportSettings.AboutLink
+	props["HelpLink"] = *c.SupportSettings.HelpLink
+	props["ReportAProblemLink"] = *c.SupportSettings.ReportAProblemLink
+	props["SupportEmail"] = *c.SupportSettings.SupportEmail
 
 	props["EnablePublicLink"] = strconv.FormatBool(c.FileSettings.EnablePublicLink)
 	props["ProfileHeight"] = fmt.Sprintf("%v", c.FileSettings.ProfileHeight)
 	props["ProfileWidth"] = fmt.Sprintf("%v", c.FileSettings.ProfileWidth)
+
+	props["EnableLdap"] = strconv.FormatBool(*c.LdapSettings.Enable)
 
 	return props
 }

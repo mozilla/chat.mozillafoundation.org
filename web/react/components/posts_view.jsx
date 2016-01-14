@@ -1,25 +1,42 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const UserStore = require('../stores/user_store.jsx');
-const Utils = require('../utils/utils.jsx');
-const Post = require('./post.jsx');
-const Constants = require('../utils/constants.jsx');
+import UserStore from '../stores/user_store.jsx';
+import PreferenceStore from '../stores/preference_store.jsx';
+import * as EventHelpers from '../dispatcher/event_helpers.jsx';
+import * as Utils from '../utils/utils.jsx';
+import Post from './post.jsx';
+import Constants from '../utils/constants.jsx';
+import DelayedAction from '../utils/delayed_action.jsx';
+const Preferences = Constants.Preferences;
 
 export default class PostsView extends React.Component {
     constructor(props) {
         super(props);
 
+        this.updateState = this.updateState.bind(this);
         this.handleScroll = this.handleScroll.bind(this);
+        this.handleScrollStop = this.handleScrollStop.bind(this);
         this.isAtBottom = this.isAtBottom.bind(this);
         this.loadMorePostsTop = this.loadMorePostsTop.bind(this);
+        this.loadMorePostsBottom = this.loadMorePostsBottom.bind(this);
         this.createPosts = this.createPosts.bind(this);
         this.updateScrolling = this.updateScrolling.bind(this);
         this.handleResize = this.handleResize.bind(this);
+        this.scrollToBottom = this.scrollToBottom.bind(this);
+        this.scrollToBottomAnimated = this.scrollToBottomAnimated.bind(this);
 
         this.jumpToPostNode = null;
         this.wasAtBottom = true;
         this.scrollHeight = 0;
+
+        this.scrollStopAction = new DelayedAction(this.handleScrollStop);
+
+        this.state = {
+            displayNameType: PreferenceStore.get(Preferences.CATEGORY_DISPLAY_SETTINGS, 'name_format', 'false'),
+            isScrolling: false,
+            topPostId: null
+        };
     }
     static get SCROLL_TYPE_FREE() {
         return 1;
@@ -27,11 +44,17 @@ export default class PostsView extends React.Component {
     static get SCROLL_TYPE_BOTTOM() {
         return 2;
     }
-    static get SIDEBAR_OPEN() {
+    static get SCROLL_TYPE_SIDEBAR_OPEN() {
         return 3;
     }
     static get SCROLL_TYPE_NEW_MESSAGE() {
         return 4;
+    }
+    static get SCROLL_TYPE_POST() {
+        return 5;
+    }
+    updateState() {
+        this.setState({displayNameType: PreferenceStore.get(Preferences.CATEGORY_DISPLAY_SETTINGS, 'name_format', 'false')});
     }
     isAtBottom() {
         return ((this.refs.postlist.scrollHeight - this.refs.postlist.scrollTop) === this.refs.postlist.clientHeight);
@@ -47,14 +70,70 @@ export default class PostsView extends React.Component {
             }
         }
         this.wasAtBottom = this.isAtBottom();
+        if (!this.jumpToPostNode && childNodes.length > 0) {
+            this.jumpToPostNode = childNodes[childNodes.length - 1];
+        }
 
         // --- --------
 
         this.props.postViewScrolled(this.isAtBottom());
         this.prevScrollHeight = this.refs.postlist.scrollHeight;
+        this.prevOffsetTop = this.jumpToPostNode.offsetTop;
+
+        this.updateFloatingTimestamp();
+
+        if (!this.state.isScrolling) {
+            this.setState({
+                isScrolling: true
+            });
+        }
+
+        this.scrollStopAction.fireAfter(1000);
+    }
+    handleScrollStop() {
+        this.setState({
+            isScrolling: false
+        });
+    }
+    updateFloatingTimestamp() {
+        // skip this in non-mobile view since that's when the timestamp is visible
+        if ($(window).width() > 768) {
+            return;
+        }
+
+        if (this.props.postList) {
+            // iterate through posts starting at the bottom since users are more likely to be viewing newer posts
+            for (let i = 0; i < this.props.postList.order.length; i++) {
+                const id = this.props.postList.order[i];
+                const element = ReactDOM.findDOMNode(this.refs[id]);
+
+                if (!element || element.offsetTop + element.clientHeight <= this.refs.postlist.scrollTop) {
+                    // this post is off the top of the screen so the last one is at the top of the screen
+                    let topPostId;
+
+                    if (i > 0) {
+                        topPostId = this.props.postList.order[i - 1];
+                    } else {
+                        // the first post we look at should always be on the screen, but handle that case anyway
+                        topPostId = id;
+                    }
+
+                    if (topPostId !== this.state.topPostId) {
+                        this.setState({
+                            topPostId
+                        });
+                    }
+
+                    break;
+                }
+            }
+        }
     }
     loadMorePostsTop() {
         this.props.loadMorePostsTopClicked();
+    }
+    loadMorePostsBottom() {
+        this.props.loadMorePostsBottomClicked();
     }
     createPosts(posts, order) {
         const postCtls = [];
@@ -63,15 +142,11 @@ export default class PostsView extends React.Component {
 
         let renderedLastViewed = false;
 
-        let numToDisplay = this.props.numPostsToDisplay;
-        if (order.length - 1 < numToDisplay) {
-            numToDisplay = order.length - 1;
-        }
-
-        for (let i = numToDisplay; i >= 0; i--) {
+        for (let i = order.length - 1; i >= 0; i--) {
             const post = posts[order[i]];
             const parentPost = posts[post.parent_id];
             const prevPost = posts[order[i + 1]];
+            const postUserId = Utils.isSystemMessage(post) ? '' : post.user_id;
 
             // If the post is a comment whose parent has been deleted, don't add it to the list.
             if (parentPost && parentPost.state === Constants.POST_DELETED) {
@@ -87,22 +162,54 @@ export default class PostsView extends React.Component {
                 const prevPostIsComment = Utils.isComment(prevPost);
                 const postFromWebhook = Boolean(post.props && post.props.from_webhook);
                 const prevPostFromWebhook = Boolean(prevPost.props && prevPost.props.from_webhook);
+                const prevPostUserId = Utils.isSystemMessage(prevPost) ? '' : prevPost.user_id;
+                let prevWebhookName = '';
+                if (prevPost.props && prevPost.props.override_username) {
+                    prevWebhookName = prevPost.props.override_username;
+                }
+                let curWebhookName = '';
+                if (post.props && post.props.override_username) {
+                    curWebhookName = post.props.override_username;
+                }
 
-                sameUser = prevPost.user_id === post.user_id && postFromWebhook === prevPostFromWebhook &&
-                    post.create_at - prevPost.create_at <= 1000 * 60 * 5;
-                sameRoot = (postIsComment && (prevPost.id === post.root_id || prevPost.root_id === post.root_id)) || (!postIsComment && !prevPostIsComment && sameUser);
+                // consider posts from the same user if:
+                //     the previous post was made by the same user as the current post,
+                //     the previous post was made within 5 minutes of the current post,
+                //     the previous post and current post are both from webhooks or both not,
+                //     the previous post and current post have the same webhook usernames
+                if (prevPostUserId === postUserId &&
+                        post.create_at - prevPost.create_at <= 1000 * 60 * 5 &&
+                        postFromWebhook === prevPostFromWebhook &&
+                        prevWebhookName === curWebhookName) {
+                    sameUser = true;
+                }
+
+                // consider posts from the same root if:
+                //     the current post is a comment,
+                //     the current post has the same root as the previous post
+                if (postIsComment && (prevPost.id === post.root_id || prevPost.root_id === post.root_id)) {
+                    sameRoot = true;
+                }
+
+                // consider posts from the same root if:
+                //     the current post is not a comment,
+                //     the previous post is not a comment,
+                //     the previous post is from the same user
+                if (!postIsComment && !prevPostIsComment && sameUser) {
+                    sameRoot = true;
+                }
 
                 // hide the profile pic if:
                 //     the previous post was made by the same user as the current post,
                 //     the previous post is not a comment,
                 //     the current post is not a comment,
-                //     the current post is not from a webhook
-                //     and the previous post is not from a webhook
-                if ((prevPost.user_id === post.user_id) &&
+                //     the previous post and current post are both from webhooks or both not,
+                //     the previous post and current post have the same webhook usernames
+                if (prevPostUserId === postUserId &&
                         !prevPostIsComment &&
                         !postIsComment &&
-                        !postFromWebhook &&
-                        !prevPostFromWebhook) {
+                        postFromWebhook === prevPostFromWebhook &&
+                        prevWebhookName === curWebhookName) {
                     hideProfilePic = true;
                 }
             }
@@ -112,6 +219,8 @@ export default class PostsView extends React.Component {
             const isLastComment = Utils.isComment(post) && (i === 0 || posts[order[i - 1]].root_id !== post.root_id);
 
             const keyPrefix = post.id ? post.id : i;
+
+            const shouldHighlight = this.props.postsToHighlight && this.props.postsToHighlight.hasOwnProperty(post.id);
 
             const postCtl = (
                 <Post
@@ -124,6 +233,9 @@ export default class PostsView extends React.Component {
                     posts={posts}
                     hideProfilePic={hideProfilePic}
                     isLastComment={isLastComment}
+                    shouldHighlight={shouldHighlight}
+                    onClick={() => EventHelpers.emitPostFocusEvent(post.id)} //eslint-disable-line no-loop-func
+                    displayNameType={this.state.displayNameType}
                 />
             );
 
@@ -140,7 +252,7 @@ export default class PostsView extends React.Component {
                 );
             }
 
-            if (post.user_id !== userId &&
+            if (postUserId !== userId &&
                     this.props.messageSeparatorTime !== 0 &&
                     post.create_at > this.props.messageSeparatorTime &&
                     !renderedLastViewed) {
@@ -173,21 +285,23 @@ export default class PostsView extends React.Component {
     }
     updateScrolling() {
         if (this.props.scrollType === PostsView.SCROLL_TYPE_BOTTOM) {
-            window.requestAnimationFrame(() => {
-                this.refs.postlist.scrollTop = this.refs.postlist.scrollHeight;
-            });
+            this.scrollToBottom();
         } else if (this.props.scrollType === PostsView.SCROLL_TYPE_NEW_MESSAGE) {
             window.requestAnimationFrame(() => {
                 // If separator exists scroll to it. Otherwise scroll to bottom.
                 if (this.refs.newMessageSeparator) {
-                    this.refs.newMessageSeparator.scrollIntoView();
+                    var objDiv = this.refs.postlist;
+                    objDiv.scrollTop = this.refs.newMessageSeparator.offsetTop; //scrolls node to top of Div
                 } else {
                     this.refs.postlist.scrollTop = this.refs.postlist.scrollHeight;
                 }
             });
-        } else if (this.props.scrollType === PostsView.SCROLL_TYPE_POST && this.props.scrollPost) {
+        } else if (this.props.scrollType === PostsView.SCROLL_TYPE_POST && this.props.scrollPostId) {
             window.requestAnimationFrame(() => {
-                const postNode = ReactDOM.findDOMNode(this.refs[this.props.scrollPost]);
+                const postNode = ReactDOM.findDOMNode(this.refs[this.props.scrollPostId]);
+                if (postNode == null) {
+                    return;
+                }
                 postNode.scrollIntoView();
                 if (this.refs.postlist.scrollTop === postNode.offsetTop) {
                     this.refs.postlist.scrollTop -= (this.refs.postlist.offsetHeight / 3);
@@ -195,7 +309,7 @@ export default class PostsView extends React.Component {
                     this.refs.postlist.scrollTop -= (this.refs.postlist.offsetHeight / 3) + (this.refs.postlist.scrollTop - postNode.offsetTop);
                 }
             });
-        } else if (this.props.scrollType === PostsView.SIDEBAR_OPEN) {
+        } else if (this.props.scrollType === PostsView.SCROLL_TYPE_SIDEBAR_OPEN) {
             // If we are at the bottom then stay there
             if (this.wasAtBottom) {
                 this.refs.postlist.scrollTop = this.refs.postlist.scrollHeight;
@@ -211,37 +325,58 @@ export default class PostsView extends React.Component {
             }
         } else if (this.refs.postlist.scrollHeight !== this.prevScrollHeight) {
             window.requestAnimationFrame(() => {
-                this.refs.postlist.scrollTop += (this.refs.postlist.scrollHeight - this.prevScrollHeight);
+                // Only need to jump if we added posts to the top.
+                if (this.jumpToPostNode && (this.jumpToPostNode.offsetTop !== this.prevOffsetTop)) {
+                    this.refs.postlist.scrollTop += (this.refs.postlist.scrollHeight - this.prevScrollHeight);
+                }
             });
         }
     }
     handleResize() {
         this.updateScrolling();
     }
+    scrollToBottom() {
+        window.requestAnimationFrame(() => {
+            this.refs.postlist.scrollTop = this.refs.postlist.scrollHeight;
+        });
+    }
+    scrollToBottomAnimated() {
+        var postList = $(this.refs.postlist);
+        postList.animate({scrollTop: this.refs.postlist.scrollHeight}, '500');
+    }
     componentDidMount() {
-        this.updateScrolling();
+        if (this.props.postList != null) {
+            this.updateScrolling();
+        }
         window.addEventListener('resize', this.handleResize);
     }
     componentWillUnmount() {
         window.removeEventListener('resize', this.handleResize);
     }
     componentDidUpdate() {
-        this.updateScrolling();
+        if (this.props.postList != null) {
+            this.updateScrolling();
+        }
     }
-    shouldComponentUpdate(nextProps) {
+    componentWillReceiveProps(nextProps) {
+        if (!this.props.isActive && nextProps.isActive) {
+            this.updateState();
+            PreferenceStore.addChangeListener(this.updateState);
+        } else if (this.props.isActive && !nextProps.isActive) {
+            PreferenceStore.removeChangeListener(this.updateState);
+        }
+    }
+    shouldComponentUpdate(nextProps, nextState) {
         if (this.props.isActive !== nextProps.isActive) {
             return true;
         }
         if (this.props.postList !== nextProps.postList) {
             return true;
         }
-        if (this.props.scrollPost !== nextProps.scrollPost) {
+        if (this.props.scrollPostId !== nextProps.scrollPostId) {
             return true;
         }
         if (this.props.scrollType !== nextProps.scrollType && nextProps.scrollType !== PostsView.SCROLL_TYPE_FREE) {
-            return true;
-        }
-        if (this.props.numPostsToDisplay !== nextProps.numPostsToDisplay) {
             return true;
         }
         if (this.props.messageSeparatorTime !== nextProps.messageSeparatorTime) {
@@ -250,13 +385,23 @@ export default class PostsView extends React.Component {
         if (!Utils.areObjectsEqual(this.props.postList, nextProps.postList)) {
             return true;
         }
+        if (nextState.displayNameType !== this.state.displayNameType) {
+            return true;
+        }
+        if (this.state.topPostId !== nextState.topPostId) {
+            return true;
+        }
+        if (this.state.isScrolling !== nextState.isScrolling) {
+            return true;
+        }
 
         return false;
     }
     render() {
         let posts = [];
         let order = [];
-        let moreMessages;
+        let moreMessagesTop;
+        let moreMessagesBottom;
         let postElements;
         let activeClass = 'inactive';
         if (this.props.postList != null) {
@@ -264,10 +409,10 @@ export default class PostsView extends React.Component {
             order = this.props.postList.order;
 
             // Create intro message or top loadmore link
-            if (order.length >= this.props.numPostsToDisplay) {
-                moreMessages = (
+            if (this.props.showMoreMessagesTop) {
+                moreMessagesTop = (
                     <a
-                        ref='loadmore'
+                        ref='loadmoretop'
                         className='more-messages-text theme'
                         href='#'
                         onClick={this.loadMorePostsTop}
@@ -276,7 +421,23 @@ export default class PostsView extends React.Component {
                     </a>
                 );
             } else {
-                moreMessages = this.props.introText;
+                moreMessagesTop = this.props.introText;
+            }
+
+            // Give option to load more posts at bottom if nessisary
+            if (this.props.showMoreMessagesBottom) {
+                moreMessagesBottom = (
+                    <a
+                        ref='loadmorebottom'
+                        className='more-messages-text theme'
+                        href='#'
+                        onClick={this.loadMorePostsBottom}
+                    >
+                        {'Load more messages'}
+                    </a>
+                );
+            } else {
+                moreMessagesBottom = null;
             }
 
             // Create post elements
@@ -288,19 +449,36 @@ export default class PostsView extends React.Component {
             }
         }
 
+        let topPost = null;
+        if (this.state.topPostId) {
+            topPost = this.props.postList.posts[this.state.topPostId];
+        }
+
         return (
-            <div
-                ref='postlist'
-                className={'post-list-holder-by-time ' + activeClass}
-                onScroll={this.handleScroll}
-            >
-                <div className='post-list__table'>
-                    <div
-                        ref='postlistcontent'
-                        className='post-list__content'
-                    >
-                        {moreMessages}
-                        {postElements}
+            <div className={activeClass}>
+                <FloatingTimestamp
+                    isScrolling={this.state.isScrolling}
+                    post={topPost}
+                />
+                <ScrollToBottomArrows
+                    isScrolling={this.state.isScrolling}
+                    atBottom={this.wasAtBottom}
+                    onClick={this.scrollToBottomAnimated}
+                />
+                <div
+                    ref='postlist'
+                    className='post-list-holder-by-time'
+                    onScroll={this.handleScroll}
+                >
+                    <div className='post-list__table'>
+                        <div
+                            ref='postlistcontent'
+                            className='post-list__content'
+                        >
+                            {moreMessagesTop}
+                            {postElements}
+                            {moreMessagesBottom}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -313,11 +491,57 @@ PostsView.defaultProps = {
 PostsView.propTypes = {
     isActive: React.PropTypes.bool,
     postList: React.PropTypes.object,
-    scrollPost: React.PropTypes.string,
+    scrollPostId: React.PropTypes.string,
     scrollType: React.PropTypes.number,
     postViewScrolled: React.PropTypes.func.isRequired,
     loadMorePostsTopClicked: React.PropTypes.func.isRequired,
-    numPostsToDisplay: React.PropTypes.number,
+    loadMorePostsBottomClicked: React.PropTypes.func.isRequired,
+    showMoreMessagesTop: React.PropTypes.bool,
+    showMoreMessagesBottom: React.PropTypes.bool,
     introText: React.PropTypes.element,
-    messageSeparatorTime: React.PropTypes.number
+    messageSeparatorTime: React.PropTypes.number,
+    postsToHighlight: React.PropTypes.object
 };
+
+function FloatingTimestamp({isScrolling, post}) {
+    // only show on mobile
+    if ($(window).width() > 768) {
+        return <noscript />;
+    }
+
+    if (!post) {
+        return <noscript />;
+    }
+
+    const dateString = Utils.getDateForUnixTicks(post.create_at).toDateString();
+
+    let className = 'post-list__timestamp';
+    if (isScrolling) {
+        className += ' scrolling';
+    }
+
+    return (
+        <div className={className}>
+            <span>{dateString}</span>
+        </div>
+    );
+}
+
+function ScrollToBottomArrows({isScrolling, atBottom, onClick}) {
+    // only show on mobile
+    if ($(window).width() > 768) {
+        return <noscript />;
+    }
+
+    let className = 'post-list__arrows';
+    if (isScrolling && !atBottom) {
+        className += ' scrolling';
+    }
+
+    return (
+        <div
+            className={className}
+            onClick={onClick}
+        />
+    );
+}

@@ -4,10 +4,10 @@
 package utils
 
 import (
-	l4g "code.google.com/p/log4go"
 	"crypto/tls"
 	"encoding/base64"
 	"fmt"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/mattermost/platform/model"
 	"net"
 	"net/mail"
@@ -98,10 +98,11 @@ func SendMail(to, subject, body string) *model.AppError {
 }
 
 func SendMailUsingConfig(to, subject, body string, config *model.Config) *model.AppError {
-
 	if !config.EmailSettings.SendEmailNotifications || len(config.EmailSettings.SMTPServer) == 0 {
 		return nil
 	}
+
+	l4g.Debug("sending mail to " + to + " with subject of '" + subject + "'")
 
 	fromMail := mail.Address{config.EmailSettings.FeedbackName, config.EmailSettings.FeedbackEmail}
 	toMail := mail.Address{"", to}

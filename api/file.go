@@ -5,8 +5,8 @@ package api
 
 import (
 	"bytes"
-	l4g "code.google.com/p/log4go"
 	"fmt"
+	l4g "github.com/alecthomas/log4go"
 	"github.com/disintegration/imaging"
 	"github.com/goamz/goamz/aws"
 	"github.com/goamz/goamz/s3"
@@ -23,7 +23,6 @@ import (
 	"image/jpeg"
 	"io"
 	"io/ioutil"
-	"mime"
 	"net/http"
 	"net/url"
 	"os"
@@ -73,6 +72,12 @@ func uploadFile(c *Context, w http.ResponseWriter, r *http.Request) {
 	if len(utils.Cfg.FileSettings.DriverName) == 0 {
 		c.Err = model.NewAppError("uploadFile", "Unable to upload file. Image storage is not configured.", "")
 		c.Err.StatusCode = http.StatusNotImplemented
+		return
+	}
+
+	if r.ContentLength > model.MAX_FILE_SIZE {
+		c.Err = model.NewAppError("uploadFile", "Unable to upload file. File is too large.", "")
+		c.Err.StatusCode = http.StatusRequestEntityTooLarge
 		return
 	}
 
@@ -317,25 +322,22 @@ func getFileInfo(c *Context, w http.ResponseWriter, r *http.Request) {
 	cchan := Srv.Store.Channel().CheckPermissionsTo(c.Session.TeamId, channelId, c.Session.UserId)
 
 	path := "teams/" + c.Session.TeamId + "/channels/" + channelId + "/users/" + userId + "/" + filename
-	size := ""
+	var info *model.FileInfo
 
-	if s, ok := fileInfoCache.Get(path); ok {
-		size = s.(string)
+	if cached, ok := fileInfoCache.Get(path); ok {
+		info = cached.(*model.FileInfo)
 	} else {
-
 		fileData := make(chan []byte)
 		getFileAndForget(path, fileData)
 
-		f := <-fileData
-
-		if f == nil {
-			c.Err = model.NewAppError("getFileInfo", "Could not find file.", "path="+path)
-			c.Err.StatusCode = http.StatusNotFound
+		newInfo, err := model.GetInfoForBytes(filename, <-fileData)
+		if err != nil {
+			c.Err = err
 			return
+		} else {
+			fileInfoCache.Add(path, newInfo)
+			info = newInfo
 		}
-
-		size = strconv.Itoa(len(f))
-		fileInfoCache.Add(path, size)
 	}
 
 	if !c.HasPermissionsToChannel(cchan, "getFileInfo") {
@@ -344,19 +346,7 @@ func getFileInfo(c *Context, w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Cache-Control", "max-age=2592000, public")
 
-	var mimeType string
-	ext := filepath.Ext(filename)
-	if model.IsFileExtImage(ext) {
-		mimeType = model.GetImageMimeType(ext)
-	} else {
-		mimeType = mime.TypeByExtension(ext)
-	}
-
-	result := make(map[string]string)
-	result["filename"] = filename
-	result["size"] = size
-	result["mime"] = mimeType
-	w.Write([]byte(model.MapToJson(result)))
+	w.Write([]byte(info.ToJson()))
 }
 
 func getFile(c *Context, w http.ResponseWriter, r *http.Request) {
@@ -532,7 +522,7 @@ func writeFile(f []byte, path string) *model.AppError {
 		auth.AccessKey = utils.Cfg.FileSettings.AmazonS3AccessKeyId
 		auth.SecretKey = utils.Cfg.FileSettings.AmazonS3SecretAccessKey
 
-		s := s3.New(auth, aws.Regions[utils.Cfg.FileSettings.AmazonS3Region])
+		s := s3.New(auth, awsRegion())
 		bucket := s.Bucket(utils.Cfg.FileSettings.AmazonS3Bucket)
 
 		ext := filepath.Ext(path)
@@ -551,15 +541,23 @@ func writeFile(f []byte, path string) *model.AppError {
 			return model.NewAppError("writeFile", "Encountered an error writing to S3", err.Error())
 		}
 	} else if utils.Cfg.FileSettings.DriverName == model.IMAGE_DRIVER_LOCAL {
-		if err := os.MkdirAll(filepath.Dir(utils.Cfg.FileSettings.Directory+path), 0774); err != nil {
-			return model.NewAppError("writeFile", "Encountered an error creating the directory for the new file", err.Error())
-		}
-
-		if err := ioutil.WriteFile(utils.Cfg.FileSettings.Directory+path, f, 0644); err != nil {
-			return model.NewAppError("writeFile", "Encountered an error writing to local server storage", err.Error())
+		if err := writeFileLocally(f, utils.Cfg.FileSettings.Directory+path); err != nil {
+			return err
 		}
 	} else {
 		return model.NewAppError("writeFile", "File storage not configured properly. Please configure for either S3 or local server file storage.", "")
+	}
+
+	return nil
+}
+
+func writeFileLocally(f []byte, path string) *model.AppError {
+	if err := os.MkdirAll(filepath.Dir(path), 0774); err != nil {
+		return model.NewAppError("writeFile", "Encountered an error creating the directory for the new file", err.Error())
+	}
+
+	if err := ioutil.WriteFile(path, f, 0644); err != nil {
+		return model.NewAppError("writeFile", "Encountered an error writing to local server storage", err.Error())
 	}
 
 	return nil
@@ -572,7 +570,7 @@ func readFile(path string) ([]byte, *model.AppError) {
 		auth.AccessKey = utils.Cfg.FileSettings.AmazonS3AccessKeyId
 		auth.SecretKey = utils.Cfg.FileSettings.AmazonS3SecretAccessKey
 
-		s := s3.New(auth, aws.Regions[utils.Cfg.FileSettings.AmazonS3Region])
+		s := s3.New(auth, awsRegion())
 		bucket := s.Bucket(utils.Cfg.FileSettings.AmazonS3Bucket)
 
 		// try to get the file from S3 with some basic retry logic
@@ -622,4 +620,18 @@ func openFileWriteStream(path string) (io.Writer, *model.AppError) {
 
 func closeFileWriteStream(file io.Writer) {
 	file.(*os.File).Close()
+}
+
+func awsRegion() aws.Region {
+	if region, ok := aws.Regions[utils.Cfg.FileSettings.AmazonS3Region]; ok {
+		return region
+	}
+
+	return aws.Region{
+		Name:                 utils.Cfg.FileSettings.AmazonS3Region,
+		S3Endpoint:           utils.Cfg.FileSettings.AmazonS3Endpoint,
+		S3BucketEndpoint:     utils.Cfg.FileSettings.AmazonS3BucketEndpoint,
+		S3LocationConstraint: *utils.Cfg.FileSettings.AmazonS3LocationConstraint,
+		S3LowercaseBucket:    *utils.Cfg.FileSettings.AmazonS3LowercaseBucket,
+	}
 }

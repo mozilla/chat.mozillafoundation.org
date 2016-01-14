@@ -1,9 +1,9 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var utils = require('../utils/utils.jsx');
-var Client = require('../utils/client.jsx');
-var Constants = require('../utils/constants.jsx');
+import * as utils from '../utils/utils.jsx';
+import * as Client from '../utils/client.jsx';
+import Constants from '../utils/constants.jsx';
 
 export default class FileAttachment extends React.Component {
     constructor(props) {
@@ -125,10 +125,6 @@ export default class FileAttachment extends React.Component {
     getFileInfoFromName(name) {
         var fileInfo = utils.splitFileLocation(name);
 
-        // This is a temporary patch to fix issue with old files using absolute paths
-        if (fileInfo.path.indexOf('/api/v1/files/get') !== -1) {
-            fileInfo.path = fileInfo.path.split('/api/v1/files/get')[1];
-        }
         fileInfo.path = utils.getWindowLocationOrigin() + '/api/v1/files/get' + fileInfo.path;
 
         return fileInfo;
@@ -270,7 +266,7 @@ export default class FileAttachment extends React.Component {
                         href={fileUrl}
                         download={filenameString}
                         data-toggle='tooltip'
-                        title={'Download ' + filenameString}
+                        title={'Download \"' + filenameString + '\"'}
                         className='post-image__name'
                     >
                         {trimmedFilename}

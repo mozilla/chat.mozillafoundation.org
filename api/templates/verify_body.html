@@ -17,7 +17,7 @@
                                     <table border="0" cellpadding="0" cellspacing="0" style="padding: 20px 50px 0; text-align: center; margin: 0 auto">
                                         <tr>
                                             <td style="border-bottom: 1px solid #ddd; padding: 0 0 20px;">
-                                                <h2 style="font-weight: normal; margin-top: 10px;">You've been invited</h2>
+                                                <h2 style="font-weight: normal; margin-top: 10px;">You've joined the {{ .Props.TeamDisplayName }} team</h2>
                                                 <p>Please verify your email address by clicking below.</p>
                                                 <p style="margin: 20px 0 15px">
                                                     <a href="{{.Props.VerifyUrl}}" style="background: #2389D7; border-radius: 3px; color: #fff; border: none; outline: none; min-width: 200px; padding: 15px 25px; font-size: 14px; font-family: inherit; cursor: pointer; -webkit-appearance: none;text-decoration: none;">Verify Email</a>
@@ -25,25 +25,13 @@
                                             </td>
                                         </tr>
                                         <tr>
-                                            <td style="color: #999; padding-top: 20px; line-height: 25px; font-size: 13px;">
-                                                Any questions at all, mail us any time: <a href="mailto:{{.ClientCfg.FeedbackEmail}}" style="text-decoration: none; color:#2389D7;">{{.ClientCfg.FeedbackEmail}}</a>.<br>
-                                                Best wishes,<br>
-                                                The {{.ClientCfg.SiteName}} Team<br>
-                                            </td>
+                                            {{template "email_info" . }}
                                         </tr>
                                     </table>
                                 </td>
                             </tr>
                             <tr>
-                                <td style="text-align: center;color: #AAA; font-size: 11px; padding-bottom: 10px;">
-                                    <p style="margin: 25px 0;">
-                                        <img width="65" src="{{.Props.SiteURL}}/static/images/circles.png" alt="">
-                                    </p>
-                                    <p style="padding: 0 50px;">
-                                        (c) 2015 Mattermost, Inc. 855 El Camino Real, 13A-168, Palo Alto, CA, 94301.<br>
-                                        If you no longer wish to receive these emails, click on the following link: <a href="mailto:{{.ClientCfg.FeedbackEmail}}?subject=Unsubscribe&body=Unsubscribe" style="text-decoration: none; color:#2389D7;">Unsubscribe</a>
-                                    </p>
-                                </td>
+                                {{template "email_footer" . }}
                             </tr>
                         </table>
                     </td>

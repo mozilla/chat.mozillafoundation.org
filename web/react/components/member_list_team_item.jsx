@@ -1,10 +1,10 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const UserStore = require('../stores/user_store.jsx');
-const Client = require('../utils/client.jsx');
-const AsyncClient = require('../utils/async_client.jsx');
-const Utils = require('../utils/utils.jsx');
+import UserStore from '../stores/user_store.jsx';
+import * as Client from '../utils/client.jsx';
+import * as AsyncClient from '../utils/async_client.jsx';
+import * as Utils from '../utils/utils.jsx';
 
 export default class MemberListTeamItem extends React.Component {
     constructor(props) {
@@ -174,24 +174,22 @@ export default class MemberListTeamItem extends React.Component {
                         height='36'
                         width='36'
                     />
-                    <span className='member-name'>{Utils.getDisplayName(user)}</span>
+                    <span className='member-name'>{Utils.displayUsername(user.id)}</span>
                     <span className='member-email'>{email}</span>
                     <div className='dropdown member-drop'>
                         <a
                             href='#'
                             className='dropdown-toggle theme'
                             type='button'
-                            id='channel_header_dropdown'
                             data-toggle='dropdown'
                             aria-expanded='true'
                         >
+                            <span className='fa fa-pencil'></span>
                             <span>{currentRoles} </span>
-                            <span className='caret'></span>
                         </a>
                         <ul
                             className='dropdown-menu member-menu'
                             role='menu'
-                            aria-labelledby='channel_header_dropdown'
                         >
                             {makeAdmin}
                             {makeMember}

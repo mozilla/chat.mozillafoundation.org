@@ -1,7 +1,10 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var Constants = require('../../utils/constants.jsx');
+import Constants from '../../utils/constants.jsx';
+
+const OverlayTrigger = ReactBootstrap.OverlayTrigger;
+const Popover = ReactBootstrap.Popover;
 
 export default class CustomThemeChooser extends React.Component {
     constructor(props) {
@@ -14,7 +17,19 @@ export default class CustomThemeChooser extends React.Component {
         this.state = {};
     }
     componentDidMount() {
-        $('.color-picker').colorpicker().on('changeColor', this.onPickerChange);
+        $('.color-picker').colorpicker({
+            format: 'hex'
+        });
+        $('.color-picker').on('changeColor', this.onPickerChange);
+    }
+    componentDidUpdate() {
+        const theme = this.props.theme;
+        Constants.THEME_ELEMENTS.forEach((element) => {
+            if (theme.hasOwnProperty(element.id) && element.id !== 'codeTheme') {
+                $('#' + element.id).data('colorpicker').color.setColor(theme[element.id]);
+                $('#' + element.id).colorpicker('update');
+            }
+        });
     }
     onPickerChange(e) {
         const theme = this.props.theme;
@@ -69,6 +84,19 @@ export default class CustomThemeChooser extends React.Component {
                     );
                 });
 
+                var popoverContent = (
+                    <Popover
+                        bsStyle='info'
+                        id='code-popover'
+                        className='code-popover'
+                    >
+                        <img
+                            width='200'
+                            src={'/static/images/themes/code_themes/' + theme[element.id] + '.png'}
+                        />
+                    </Popover>
+                );
+
                 elements.push(
                     <div
                         className='col-sm-4 form-group'
@@ -76,22 +104,28 @@ export default class CustomThemeChooser extends React.Component {
                     >
                         <label className='custom-label'>{element.uiName}</label>
                         <div
-                            className='input-group theme-group dropdown'
+                            className='input-group theme-group group--code dropdown'
                             id={element.id}
                         >
                             <select
                                 className='form-control'
                                 type='text'
-                                defaultValue={theme[element.id]}
+                                value={theme[element.id]}
                                 onChange={this.onInputChange}
                             >
                                 {codeThemeOptions}
                             </select>
+                            <OverlayTrigger
+                                placement='top'
+                                overlay={popoverContent}
+                                ref='headerOverlay'
+                            >
                             <span className='input-group-addon'>
                                 <img
                                     src={'/static/images/themes/code_themes/' + theme[element.id] + '.png'}
                                 />
                             </span>
+                            </OverlayTrigger>
                         </div>
                     </div>
                 );
@@ -109,7 +143,7 @@ export default class CustomThemeChooser extends React.Component {
                             <input
                                 className='form-control'
                                 type='text'
-                                defaultValue={theme[element.id]}
+                                value={theme[element.id]}
                                 onChange={this.onInputChange}
                             />
                             <span className='input-group-addon'><i></i></span>

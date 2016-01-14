@@ -1,8 +1,8 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var Client = require('../../utils/client.jsx');
-var AsyncClient = require('../../utils/async_client.jsx');
+import * as Client from '../../utils/client.jsx';
+import * as AsyncClient from '../../utils/async_client.jsx';
 
 export default class PrivacySettings extends React.Component {
     constructor(props) {
@@ -132,7 +132,7 @@ export default class PrivacySettings extends React.Component {
                                 />
                                     {'false'}
                             </label>
-                            <p className='help-text'>{'When false, hides full name of users from other users including team owner and team administrators.'}</p>
+                            <p className='help-text'>{'When false, hides full name of users from other users, including team owners and team administrators. Username is shown in place of full name.'}</p>
                         </div>
                     </div>
 

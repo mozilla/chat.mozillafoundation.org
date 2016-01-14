@@ -1,8 +1,8 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var UserStore = require('../stores/user_store.jsx');
-const Utils = require('../utils/utils.jsx');
+import UserStore from '../stores/user_store.jsx';
+import * as Utils from '../utils/utils.jsx';
 
 export default class MemberListItem extends React.Component {
     constructor(props) {
@@ -31,9 +31,7 @@ export default class MemberListItem extends React.Component {
         var timestamp = UserStore.getCurrentUser().update_at;
 
         var invite;
-        if (member.invited && this.props.handleInvite) {
-            invite = <span className='member-role'>Added</span>;
-        } else if (this.props.handleInvite) {
+        if (this.props.handleInvite) {
             invite = (
                     <a
                         onClick={this.handleInvite}
@@ -80,17 +78,15 @@ export default class MemberListItem extends React.Component {
                                 href='#'
                                 className='dropdown-toggle theme'
                                 type='button'
-                                id='channel_header_dropdown'
                                 data-toggle='dropdown'
                                 aria-expanded='true'
                             >
+                                <span className='fa fa-pencil'></span>
                                 <span className='text-capitalize'>{member.roles || 'Member'} </span>
-                                <span className='caret'></span>
                             </a>
                             <ul
                                 className='dropdown-menu member-menu'
                                 role='menu'
-                                aria-labelledby='channel_header_dropdown'
                             >
                                 {makeAdminOption}
                                 {handleRemoveOption}
@@ -98,7 +94,7 @@ export default class MemberListItem extends React.Component {
                         </div>
                     );
         } else {
-            invite = <div className='member-role text-capitalize'>{member.roles || 'Member'}<span className='caret hidden'></span></div>;
+            invite = <div className='member-role text-capitalize'><span className='fa fa-pencil hidden'></span>{member.roles || 'Member'}</div>;
         }
 
         return (
@@ -110,7 +106,7 @@ export default class MemberListItem extends React.Component {
                         height='36'
                         width='36'
                     />
-                    <div className='member-name'>{member.username}</div>
+                    <div className='member-name'>{Utils.displayUsername(member.id)}</div>
                     <div className='member-description'>{member.email}</div>
                 </td>
                 <td className='td--action lg'>{invite}</td>

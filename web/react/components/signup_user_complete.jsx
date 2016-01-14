@@ -1,10 +1,10 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var Utils = require('../utils/utils.jsx');
-var client = require('../utils/client.jsx');
-var UserStore = require('../stores/user_store.jsx');
-var BrowserStore = require('../stores/browser_store.jsx');
+import * as Utils from '../utils/utils.jsx';
+import * as client from '../utils/client.jsx';
+import UserStore from '../stores/user_store.jsx';
+import BrowserStore from '../stores/browser_store.jsx';
 
 export default class SignupUserComplete extends React.Component {
     constructor(props) {
@@ -183,8 +183,20 @@ export default class SignupUserComplete extends React.Component {
                         href={'/' + this.props.teamName + '/signup/gitlab' + window.location.search}
                     >
                         <span className='icon' />
-                        <span>with GitLab</span>
+                        <span>{'with GitLab'}</span>
                     </a>
+           );
+        }
+
+        if (global.window.mm_config.EnableSignUpWithGoogle === 'true') {
+            signupMessage.push(
+                <a
+                    className='btn btn-custom-login google'
+                    href={'/' + this.props.teamName + '/signup/google' + window.location.search}
+                >
+                    <span className='icon' />
+                    <span>{'with Google'}</span>
+                </a>
            );
         }
 

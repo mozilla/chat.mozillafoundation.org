@@ -12,6 +12,8 @@ import (
 // It should be maitained in chronological order with most current
 // release at the front of the list.
 var versions = []string{
+	"1.4.0",
+	"1.3.0",
 	"1.2.1",
 	"1.2.0",
 	"1.1.0",
@@ -26,6 +28,7 @@ var CurrentVersion string = versions[0]
 var BuildNumber = "_BUILD_NUMBER_"
 var BuildDate = "_BUILD_DATE_"
 var BuildHash = "_BUILD_HASH_"
+var BuildEnterpriseReady = "_BUILD_ENTERPRISE_READY_"
 
 func SplitVersion(version string) (int64, int64, int64) {
 	parts := strings.Split(version, ".")

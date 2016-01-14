@@ -1,8 +1,11 @@
+@charset "UTF-8";
+
 #channel_members_modal .modal-body {
 	min-height: 110px;
 }
 .modal-body {
 	padding: 20px 15px;
+	overflow: auto;
 }
 .modal {
 	width: 100%;
@@ -32,6 +35,9 @@
 		text-align: right;
 		padding-right: 0;
 	}
+	.team-member-list {
+		width: 100%;
+	}
 	.remove__member {
 		float: right;
 		color: #999;
@@ -46,9 +52,6 @@
 		max-width: 95%;
 		margin-left: auto;
 		margin-right: auto;
-	}
-	.modal-body {
-		overflow: auto;
 	}
 	.modal-push-down {
 		margin-top: 5%;
@@ -95,6 +98,7 @@
 				background: rgba(0, 0, 0, 0.1);
 			}
 			span {
+			    font-family: 'Open Sans', sans-serif;
 				line-height: 10px;
 			}
 		}
@@ -182,6 +186,7 @@
 						padding: 8px 15px 8px 8px;
 						width: 80px;
 						vertical-align: middle;
+						position: relative;
 						&.lg {
 							width: 110px;
 						}
@@ -195,21 +200,41 @@
 		width:100%;
 		height: 100%;
 		margin: 0 auto;
+		max-width: 100%;
+
+		.modal-body {
+			@include clearfix;
+			height: 100%;
+			display: table;
+			table-layout: fixed;
+			width: 100%;
+			max-height: 100%;
+		}
+
 		.image-wrapper {
 			position: relative;
 			max-width: 90%;
-			min-height: 100px;
-			min-width: 320px;
 			@include border-radius(3px);
-			display: table;
-			margin: 0 auto;
+			display: table-cell;
+			vertical-align: middle;
+			text-align: center;
+			width: 100%;
+
 			&:hover {
 				@include border-radius(3px 3px 0 0);
 			}
+
 			&.default {
 				width: 100%;
 				height: 80%;
 			}
+
+			audio, canvas, progress, video {
+				max-width: 100%;
+				height: auto;
+				display: block;
+			}
+
 			.modal-close {
 				background: url("../images/close.png") no-repeat;
 				@include background-size(100% 100%);
@@ -225,24 +250,31 @@
 				transition: opacity 0.6s;
 				cursor: pointer;
 				z-index: 9999;
+
 				&.modal-close--show {
 					@include opacity(1);
 				}
+
 			}
-			> a {
+
+			> div {
+				min-height: 100px;
+				min-width: 320px;
 				background: #FFF;
-				display: table-cell;
-				vertical-align: middle;
+				display: inline-block;
 				position: relative;
 
 				&:hover .file-playback-controls.stop {
 					@include opacity(1);
 				}
+
 			}
+
 			img {
 				max-width: 100%;
 				max-height: 100%;
 			}
+
 			.spinner.file__loading {
 				z-index: 2;
 				position: absolute;
@@ -259,7 +291,6 @@
 			height: 100%;
 			padding: 0;
 			border: none;
-			display: table;
 		}
 		.image-body {
 			vertical-align: middle;
@@ -356,9 +387,9 @@
 .more-modal {
 
 	.user-list {
+		overflow-y: auto;
+		overflow-x: hidden;
 		margin-top: 10px;
-		overflow: auto;
-		-webkit-overflow-scrolling: touch;
 		max-height: 500px;
 		position: relative;
 	}
@@ -369,12 +400,12 @@
 
 	.modal-body {
 		padding: 10px 0 20px;
-		@include clearfix;
+		overflow-x: hidden;
 	}
 
 	.filter-row {
 		margin-top: 10px;
-		padding: 0 15px;
+		@include clearfix;
 	}
 
 	.member-count {
@@ -386,4 +417,12 @@
 	.more-purpose {
 		@include opacity(0.7);
 	}
+}
+
+.modal-body.edit-modal-body {
+    overflow: visible;
+
+    .suggestion-content {
+        max-height: 150px;
+    }
 }

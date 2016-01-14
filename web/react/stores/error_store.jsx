@@ -1,15 +1,15 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
-var EventEmitter = require('events').EventEmitter;
+import AppDispatcher from '../dispatcher/app_dispatcher.jsx';
+import EventEmitter from 'events';
 
-var Constants = require('../utils/constants.jsx');
-var ActionTypes = Constants.ActionTypes;
+import Constants from '../utils/constants.jsx';
+const ActionTypes = Constants.ActionTypes;
 
-var BrowserStore = require('../stores/browser_store.jsx');
+import BrowserStore from '../stores/browser_store.jsx';
 
-var CHANGE_EVENT = 'change';
+const CHANGE_EVENT = 'change';
 
 class ErrorStoreClass extends EventEmitter {
     constructor() {
@@ -63,3 +63,4 @@ ErrorStore.dispatchToken = AppDispatcher.register((payload) => {
 });
 
 export default ErrorStore;
+window.ErrorStore = ErrorStore;

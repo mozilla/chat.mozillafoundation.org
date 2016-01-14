@@ -1,15 +1,16 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-const ConfirmModal = require('../confirm_modal.jsx');
+import ConfirmModal from '../confirm_modal.jsx';
 const Modal = ReactBootstrap.Modal;
-const SettingsSidebar = require('../settings_sidebar.jsx');
-const UserSettings = require('./user_settings.jsx');
+import SettingsSidebar from '../settings_sidebar.jsx';
+import UserSettings from './user_settings.jsx';
 
 export default class UserSettingsModal extends React.Component {
     constructor(props) {
         super(props);
 
+        this.handleShow = this.handleShow.bind(this);
         this.handleHide = this.handleHide.bind(this);
         this.handleHidden = this.handleHidden.bind(this);
         this.handleCollapse = this.handleCollapse.bind(this);
@@ -33,12 +34,24 @@ export default class UserSettingsModal extends React.Component {
         this.requireConfirm = false;
     }
 
+    componentDidMount() {
+        if (this.props.show) {
+            this.handleShow();
+        }
+    }
+
     componentDidUpdate(prevProps) {
-        if (!prevProps.show && this.props.show) {
-            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 300);
-            if ($(window).width() > 768) {
-                $(ReactDOM.findDOMNode(this.refs.modalBody)).perfectScrollbar();
-            }
+        if (this.props.show && !prevProps.show) {
+            this.handleShow();
+        }
+    }
+
+    handleShow() {
+        if ($(window).width() > 768) {
+            $(ReactDOM.findDOMNode(this.refs.modalBody)).perfectScrollbar();
+            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 200);
+        } else {
+            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 50);
         }
     }
 

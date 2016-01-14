@@ -5,10 +5,11 @@ package model
 
 import (
 	"bytes"
-	"code.google.com/p/go-uuid/uuid"
+	"crypto/rand"
 	"encoding/base32"
 	"encoding/json"
 	"fmt"
+	"github.com/pborman/uuid"
 	"io"
 	"net/mail"
 	"net/url"
@@ -53,7 +54,7 @@ func AppErrorFromJson(data io.Reader) *AppError {
 	if err == nil {
 		return &er
 	} else {
-		return nil
+		return NewAppError("AppErrorFromJson", "could not decode", err.Error())
 	}
 }
 
@@ -78,6 +79,17 @@ func NewId() string {
 	encoder.Write(uuid.NewRandom())
 	encoder.Close()
 	b.Truncate(26) // removes the '==' padding
+	return b.String()
+}
+
+func NewRandomString(length int) string {
+	var b bytes.Buffer
+	str := make([]byte, length+8)
+	rand.Read(str)
+	encoder := base32.NewEncoder(encoding, &b)
+	encoder.Write(str)
+	encoder.Close()
+	b.Truncate(length) // removes the '==' padding
 	return b.String()
 }
 
@@ -261,9 +273,9 @@ func Etag(parts ...interface{}) string {
 	return etag
 }
 
-var validHashtag = regexp.MustCompile(`^(#[A-Za-z]+[A-Za-z0-9_\-]*[A-Za-z0-9])$`)
-var puncStart = regexp.MustCompile(`^[.,()&$!\[\]{}':;\\]+`)
-var puncEnd = regexp.MustCompile(`[.,()&$#!\[\]{}';\\]+$`)
+var validHashtag = regexp.MustCompile(`^(#[A-Za-zäöüÄÖÜß]+[A-Za-z0-9äöüÄÖÜß_\-]*[A-Za-z0-9äöüÄÖÜß])$`)
+var puncStart = regexp.MustCompile(`^[.,()&$!\?\[\]{}':;\\]+`)
+var puncEnd = regexp.MustCompile(`[.,()&$#!\?\[\]{}';\\]+$`)
 
 func ParseHashtags(text string) (string, string) {
 	words := strings.Fields(text)

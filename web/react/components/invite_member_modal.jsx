@@ -1,14 +1,16 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var utils = require('../utils/utils.jsx');
-var ActionTypes = require('../utils/constants.jsx').ActionTypes;
-var AppDispatcher = require('../dispatcher/app_dispatcher.jsx');
-var Client = require('../utils/client.jsx');
-var ModalStore = require('../stores/modal_store.jsx');
-var UserStore = require('../stores/user_store.jsx');
-var TeamStore = require('../stores/team_store.jsx');
-var ConfirmModal = require('./confirm_modal.jsx');
+import * as utils from '../utils/utils.jsx';
+import Constants from '../utils/constants.jsx';
+const ActionTypes = Constants.ActionTypes;
+import * as Client from '../utils/client.jsx';
+import * as EventHelpers from '../dispatcher/event_helpers.jsx';
+import ModalStore from '../stores/modal_store.jsx';
+import UserStore from '../stores/user_store.jsx';
+import ChannelStore from '../stores/channel_store.jsx';
+import TeamStore from '../stores/team_store.jsx';
+import ConfirmModal from './confirm_modal.jsx';
 
 const Modal = ReactBootstrap.Modal;
 
@@ -22,6 +24,7 @@ export default class InviteMemberModal extends React.Component {
         this.addInviteFields = this.addInviteFields.bind(this);
         this.clearFields = this.clearFields.bind(this);
         this.removeInviteFields = this.removeInviteFields.bind(this);
+        this.showGetTeamInviteLinkModal = this.showGetTeamInviteLinkModal.bind(this);
 
         this.state = {
             show: false,
@@ -31,6 +34,7 @@ export default class InviteMemberModal extends React.Component {
             firstNameErrors: {},
             lastNameErrors: {},
             emailEnabled: global.window.mm_config.SendEmailNotifications === 'true',
+            userCreationEnabled: global.window.mm_config.EnableUserCreation === 'true',
             showConfirmModal: false,
             isSendingEmails: false
         };
@@ -141,7 +145,7 @@ export default class InviteMemberModal extends React.Component {
 
     componentDidUpdate(prevProps, prevState) {
         if (!prevState.show && this.state.show) {
-            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 300);
+            $(ReactDOM.findDOMNode(this.refs.modalBody)).css('max-height', $(window).height() - 200);
             if ($(window).width() > 768) {
                 $(ReactDOM.findDOMNode(this.refs.modalBody)).perfectScrollbar();
             }
@@ -185,6 +189,12 @@ export default class InviteMemberModal extends React.Component {
             inviteIds.push(++count);
         }
         this.setState({inviteIds: inviteIds, idCount: count});
+    }
+
+    showGetTeamInviteLinkModal() {
+        this.handleHide(false);
+
+        EventHelpers.showGetTeamInviteLinkModal();
     }
 
     render() {
@@ -244,7 +254,7 @@ export default class InviteMemberModal extends React.Component {
                                             ref={'first_name' + index}
                                             placeholder='First name'
                                             maxLength='64'
-                                            disabled={!this.state.emailEnabled}
+                                            disabled={!this.state.emailEnabled || !this.state.userCreationEnabled}
                                             spellCheck='false'
                                         />
                                         {firstNameError}
@@ -258,7 +268,7 @@ export default class InviteMemberModal extends React.Component {
                                             ref={'last_name' + index}
                                             placeholder='Last name'
                                             maxLength='64'
-                                            disabled={!this.state.emailEnabled}
+                                            disabled={!this.state.emailEnabled || !this.state.userCreationEnabled}
                                             spellCheck='false'
                                         />
                                         {lastNameError}
@@ -277,7 +287,7 @@ export default class InviteMemberModal extends React.Component {
                             className='form-control'
                             placeholder='email@domain.com'
                             maxLength='64'
-                            disabled={!this.state.emailEnabled}
+                            disabled={!this.state.emailEnabled || !this.state.userCreationEnabled}
                             spellCheck='false'
                         />
                         {emailError}
@@ -295,7 +305,12 @@ export default class InviteMemberModal extends React.Component {
             var content = null;
             var sendButton = null;
 
-            if (this.state.emailEnabled) {
+            var defaultChannelName = '';
+            if (ChannelStore.getByName(Constants.DEFAULT_CHANNEL)) {
+                defaultChannelName = ChannelStore.getByName(Constants.DEFAULT_CHANNEL).display_name;
+            }
+
+            if (this.state.emailEnabled && this.state.userCreationEnabled) {
                 content = (
                     <div>
                         {serverError}
@@ -303,10 +318,10 @@ export default class InviteMemberModal extends React.Component {
                             type='button'
                             className='btn btn-default'
                             onClick={this.addInviteFields}
-                        >Add another</button>
+                        >{'Add another'}</button>
                         <br/>
                         <br/>
-                        <span>People invited automatically join Town Square channel.</span>
+                        <span>{'People invited automatically join the '}<strong>{defaultChannelName}</strong>{' channel.'}</span>
                     </div>
                 );
 
@@ -329,33 +344,35 @@ export default class InviteMemberModal extends React.Component {
                         {sendButtonLabel}
                     </button>
                 );
-            } else {
+            } else if (this.state.userCreationEnabled) {
                 var teamInviteLink = null;
                 if (currentUser && TeamStore.getCurrent().type === 'O') {
-                    var linkUrl = utils.getWindowLocationOrigin() + '/signup_user_complete/?id=' + TeamStore.getCurrent().invite_id;
-                    var link =
-                        (
-                            <a
-                                href='#'
-                                data-toggle='modal'
-                                data-target='#get_link'
-                                data-title='Team Invite'
-                                data-value={linkUrl}
-                                onClick={() => this.handleHide(this, false)}
-                            >Team Invite Link</a>
+                    var link = (
+                        <a
+                            href='#'
+                            onClick={this.showGetTeamInviteLinkModal}
+                        >
+                            {'Team Invite Link'}
+                        </a>
                     );
 
                     teamInviteLink = (
                         <p>
-                            You can also invite people using the {link}.
+                            {'You can also invite people using the '}{link}{'.'}
                         </p>
                     );
                 }
 
                 content = (
                     <div>
-                        <p>Email is currently disabled for your team, and email invitations cannot be sent. Contact your system administrator to enable email and email invitations.</p>
+                        <p>{'Email is currently disabled for your team, and email invitations cannot be sent. Contact your system administrator to enable email and email invitations.'}</p>
                         {teamInviteLink}
+                    </div>
+                );
+            } else {
+                content = (
+                    <div>
+                        <p>{'User creation has been disabled for your team. Please ask your team administrator for details.'}</p>
                     </div>
                 );
             }
@@ -403,13 +420,6 @@ export default class InviteMemberModal extends React.Component {
         }
 
         return null;
-    }
-
-    static show() {
-        AppDispatcher.handleViewAction({
-            type: ActionTypes.TOGGLE_INVITE_MEMBER_MODAL,
-            value: true
-        });
     }
 }
 

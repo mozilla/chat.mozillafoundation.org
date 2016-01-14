@@ -1,8 +1,11 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var UserProfile = require('./user_profile.jsx');
-var PostInfo = require('./post_info.jsx');
+import UserProfile from './user_profile.jsx';
+import PostInfo from './post_info.jsx';
+import * as Utils from '../utils/utils.jsx';
+
+import Constants from '../utils/constants.jsx';
 
 export default class PostHeader extends React.Component {
     constructor(props) {
@@ -26,14 +29,23 @@ export default class PostHeader extends React.Component {
                 );
             }
 
-            botIndicator = <li className='post-header-col post-header__name bot-indicator'>{'BOT'}</li>;
+            botIndicator = <li className='col col__name bot-indicator'>{'BOT'}</li>;
+        } else if (Utils.isSystemMessage(post)) {
+            userProfile = (
+                <UserProfile
+                    userId={''}
+                    overwriteName={Constants.SYSTEM_MESSAGE_PROFILE_NAME}
+                    overwriteImage={Constants.SYSTEM_MESSAGE_PROFILE_IMAGE}
+                    disablePopover={true}
+                />
+            );
         }
 
         return (
-            <ul className='post-header post-header-post'>
-                <li className='post-header-col post-header__name'><strong>{userProfile}</strong></li>
+            <ul className='post__header'>
+                <li className='col col__name'>{userProfile}</li>
                 {botIndicator}
-                <li className='post-info--hidden'>
+                <li className='col'>
                     <PostInfo
                         post={post}
                         commentCount={this.props.commentCount}

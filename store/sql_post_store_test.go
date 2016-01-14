@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/mattermost/platform/model"
+	"github.com/mattermost/platform/utils"
 )
 
 func TestPostStoreSave(t *testing.T) {
@@ -247,6 +248,76 @@ func TestPostStoreDelete2Level(t *testing.T) {
 	}
 }
 
+func TestPostStorePermDelete1Level(t *testing.T) {
+	Setup()
+
+	o1 := &model.Post{}
+	o1.ChannelId = model.NewId()
+	o1.UserId = model.NewId()
+	o1.Message = "a" + model.NewId() + "b"
+	o1 = (<-store.Post().Save(o1)).Data.(*model.Post)
+
+	o2 := &model.Post{}
+	o2.ChannelId = o1.ChannelId
+	o2.UserId = model.NewId()
+	o2.Message = "a" + model.NewId() + "b"
+	o2.ParentId = o1.Id
+	o2.RootId = o1.Id
+	o2 = (<-store.Post().Save(o2)).Data.(*model.Post)
+
+	if r2 := <-store.Post().PermanentDeleteByUser(o2.UserId); r2.Err != nil {
+		t.Fatal(r2.Err)
+	}
+
+	if r3 := (<-store.Post().Get(o1.Id)); r3.Err != nil {
+		t.Fatal("Deleted id shouldn't have failed")
+	}
+
+	if r4 := (<-store.Post().Get(o2.Id)); r4.Err == nil {
+		t.Fatal("Deleted id should have failed")
+	}
+}
+
+func TestPostStorePermDelete1Level2(t *testing.T) {
+	Setup()
+
+	o1 := &model.Post{}
+	o1.ChannelId = model.NewId()
+	o1.UserId = model.NewId()
+	o1.Message = "a" + model.NewId() + "b"
+	o1 = (<-store.Post().Save(o1)).Data.(*model.Post)
+
+	o2 := &model.Post{}
+	o2.ChannelId = o1.ChannelId
+	o2.UserId = model.NewId()
+	o2.Message = "a" + model.NewId() + "b"
+	o2.ParentId = o1.Id
+	o2.RootId = o1.Id
+	o2 = (<-store.Post().Save(o2)).Data.(*model.Post)
+
+	o3 := &model.Post{}
+	o3.ChannelId = model.NewId()
+	o3.UserId = model.NewId()
+	o3.Message = "a" + model.NewId() + "b"
+	o3 = (<-store.Post().Save(o3)).Data.(*model.Post)
+
+	if r2 := <-store.Post().PermanentDeleteByUser(o1.UserId); r2.Err != nil {
+		t.Fatal(r2.Err)
+	}
+
+	if r3 := (<-store.Post().Get(o1.Id)); r3.Err == nil {
+		t.Fatal("Deleted id should have failed")
+	}
+
+	if r4 := (<-store.Post().Get(o2.Id)); r4.Err == nil {
+		t.Fatal("Deleted id should have failed")
+	}
+
+	if r5 := (<-store.Post().Get(o3.Id)); r5.Err != nil {
+		t.Fatal("Deleted id shouldn't have failed")
+	}
+}
+
 func TestPostStoreGetWithChildren(t *testing.T) {
 	Setup()
 
@@ -374,7 +445,7 @@ func TestPostStoreGetPostsWtihDetails(t *testing.T) {
 		t.Fatal("invalid order")
 	}
 
-	if len(r1.Posts) != 5 { //the last 4, + o1 (o3 and o2a's parent)
+	if len(r1.Posts) != 6 { //the last 4, + o1 (o2a and o3's parent) + o2 (in same thread as o2a and o3)
 		t.Fatal("wrong size")
 	}
 
@@ -706,7 +777,7 @@ func TestUserCountsWithPostsByDay(t *testing.T) {
 	o1 := &model.Post{}
 	o1.ChannelId = c1.Id
 	o1.UserId = model.NewId()
-	o1.CreateAt = model.GetMillis()
+	o1.CreateAt = utils.MillisFromTime(utils.Yesterday())
 	o1.Message = "a" + model.NewId() + "b"
 	o1 = Must(store.Post().Save(o1)).(*model.Post)
 
@@ -766,7 +837,7 @@ func TestPostCountsByDay(t *testing.T) {
 	o1 := &model.Post{}
 	o1.ChannelId = c1.Id
 	o1.UserId = model.NewId()
-	o1.CreateAt = model.GetMillis()
+	o1.CreateAt = utils.MillisFromTime(utils.Yesterday())
 	o1.Message = "a" + model.NewId() + "b"
 	o1 = Must(store.Post().Save(o1)).(*model.Post)
 

@@ -1,11 +1,11 @@
 // Copyright (c) 2015 Mattermost, Inc. All Rights Reserved.
 // See License.txt for license information.
 
-var Client = require('../../utils/client.jsx');
-var Utils = require('../../utils/utils.jsx');
-var Constants = require('../../utils/constants.jsx');
-var ChannelStore = require('../../stores/channel_store.jsx');
-var LoadingScreen = require('../loading_screen.jsx');
+import * as Client from '../../utils/client.jsx';
+import * as Utils from '../../utils/utils.jsx';
+import Constants from '../../utils/constants.jsx';
+import ChannelStore from '../../stores/channel_store.jsx';
+import LoadingScreen from '../loading_screen.jsx';
 
 export default class ManageIncomingHooks extends React.Component {
     constructor() {
@@ -162,7 +162,14 @@ export default class ManageIncomingHooks extends React.Component {
 
         return (
             <div key='addIncomingHook'>
-                {'Create webhook URLs for use in external integrations. Please see '}<a href='http://mattermost.org/webhooks'>{'http://mattermost.org/webhooks'}</a> {' to learn more.'}
+                {'Create webhook URLs for use in external integrations. Please see '}
+                <a
+                    href='http://mattermost.org/webhooks'
+                    target='_blank'
+                >
+                    {'http://mattermost.org/webhooks'}
+                </a>
+                {' to learn more.'}
                 <div><label className='control-label padding-top x2'>{'Add a new incoming webhook'}</label></div>
                 <div className='row padding-top'>
                     <div className='col-sm-10 padding-bottom'>
