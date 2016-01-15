@@ -53,9 +53,9 @@
         "AmazonS3Region": "${FILE_SETTINGS__AMAZON_S3_REGION}"
     },
     "EmailSettings": {
-        "EnableSignUpWithEmail": ${ENABLE_SIGNUP_WITH_EMAIL},
-        "SendEmailNotifications": ${SEND_EMAIL_NOTIFICATIONS},
-        "RequireEmailVerification": ${REQUIRE_EMAIL_VERIFICATION},
+        "EnableSignUpWithEmail": "${ENABLE_SIGNUP_WITH_EMAIL}",
+        "SendEmailNotifications": "${SEND_EMAIL_NOTIFICATIONS}",
+        "RequireEmailVerification": "${REQUIRE_EMAIL_VERIFICATION}",
         "FeedbackName": "",
         "FeedbackEmail": "",
         "SMTPUsername": "${SMTP_USERNAME}",
