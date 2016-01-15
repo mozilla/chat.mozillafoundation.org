@@ -8,4 +8,4 @@ deploy:
       develop: mattermoz-staging
       master: mattermoz-production
     on:
-      repo: cadecairos/mattermoz
+      repo: mozilla/mattermoz
