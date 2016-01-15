@@ -14,14 +14,21 @@ export FILE_SETTINGS__AMAZON_S3_ACCESS_KEY_ID=${FILE_SETTINGS__AMAZON_S3_ACCESS_
 export FILE_SETTINGS__AMAZON_S3_SECRET_ACCESS_KEY=${FILE_SETTINGS__AMAZON_S3_SECRET_ACCESS_KEY:=""}
 export FILE_SETTINGS__AMAZON_S3_BUCKET=${FILE_SETTINGS__AMAZON_S3_BUCKET:=""}
 
-# These values need to be boolean, but heroku only support string values, so we're going to strip out the quotation marks
+# The following values need to be boolean, but heroku only support string values, so we're going to strip out the quotation marks
 export ENABLE_SIGNUP_WITH_EMAIL=${ENABLE_SIGNUP_WITH_EMAIL:=false}
-export SEND_EMAIL_NOTIFICATIONS=${SEND_EMAIL_NOTIFICATIONS:=false}
-export REQUIRE_EMAIL_VERIFICATION=${REQUIRE_EMAIL_VERIFICATION:=false}
-
 export ENABLE_SIGNUP_WITH_EMAIL=`echo ${ENABLE_SIGNUP_WITH_EMAIL} | tr -d \"`
+
+export SEND_EMAIL_NOTIFICATIONS=${SEND_EMAIL_NOTIFICATIONS:=false}
 export SEND_EMAIL_NOTIFICATIONS=`echo ${SEND_EMAIL_NOTIFICATIONS} | tr -d \"`
+
+export REQUIRE_EMAIL_VERIFICATION=${REQUIRE_EMAIL_VERIFICATION:=false}
 export REQUIRE_EMAIL_VERIFICATION=`echo ${REQUIRE_EMAIL_VERIFICATION} | tr -d \"`
+
+export ENABLE_TEAM_CREATION=${ENABLE_TEAM_CREATION:=false}
+export ENABLE_TEAM_CREATION=`echo ${ENABLE_TEAM_CREATION} | tr -d \"`
+
+export ENABLE_USER_CREATION=${ENABLE_USER_CREATION:=false}
+export ENABLE_USER_CREATION=`echo ${ENABLE_USER_CREATION} | tr -d \"`
 
 lib/envsubst < config/config-heroku-template.json > config/config-heroku.json
 

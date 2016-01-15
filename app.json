@@ -62,6 +62,14 @@
             "description": "",
             "value": "false"
     },
+    "ENABLE_TEAM_CREATION": {
+            "description": "",
+            "value": "false"
+    },
+    "ENABLE_USER_CREATION": {
+            "description": "",
+            "value": "false"
+    },
     "SMTP_USERNAME": {
             "description": "",
             "value": "",
