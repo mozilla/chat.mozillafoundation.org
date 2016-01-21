@@ -7,6 +7,7 @@
         "EnableOAuthServiceProvider": false,
         "EnableIncomingWebhooks": true,
         "EnableOutgoingWebhooks": ${ENABLE_OUTGOING_WEBHOOKS},
+        "EnablePostUsernameOverride": ${ENABLE_POST_USERNAME_OVERRIDE},
         "EnablePostUsernameOverride": false,
         "EnablePostIconOverride": false,
         "EnableTesting": false,

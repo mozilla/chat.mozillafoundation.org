@@ -33,6 +33,9 @@ export ENABLE_USER_CREATION=`echo ${ENABLE_USER_CREATION} | tr -d \"`
 export ENABLE_OUTGOING_WEBHOOKS=${ENABLE_OUTGOING_WEBHOOKS:=false}
 export ENABLE_OUTGOING_WEBHOOKS=`echo ${ENABLE_OUTGOING_WEBHOOKS} | tr -d \"`
 
+export ENABLE_POST_USERNAME_OVERRIDE=${ENABLE_POST_USERNAME_OVERRIDE:=false}
+export ENABLE_POST_USERNAME_OVERRIDE=`echo ${ENABLE_POST_USERNAME_OVERRIDE} | tr -d \"`
+
 lib/envsubst < config/config-heroku-template.json > config/config-heroku.json
 
 bin/platform -config=config/config-heroku.json
