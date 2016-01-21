@@ -61,7 +61,7 @@ export default class PostBody extends React.Component {
     }
 
     componentWillMount() {
-        if (this.props.post.filenames.length === 0 && this.state.links && this.state.links.length > 0) {
+        if (this.props.post.filenames.length === 0 && this.state.links && this.state.links.length > 0 && this.props.embedVisible) {
             this.embed = this.createEmbed(this.state.links[0]);
         }
     }
@@ -90,7 +90,7 @@ export default class PostBody extends React.Component {
 
     componentWillReceiveProps(nextProps) {
         const linkData = Utils.extractLinks(nextProps.post.message);
-        if (this.props.post.filenames.length === 0 && this.state.links && this.state.links.length > 0) {
+        if (this.props.post.filenames.length === 0 && this.state.links && this.state.links.length > 0 && this.props.embedVisible) {
             this.embed = this.createEmbed(linkData.links[0]);
         }
         this.setState({links: linkData.links, message: linkData.text});
@@ -104,6 +104,7 @@ export default class PostBody extends React.Component {
                 post.props.oEmbedLink = '';
                 post.type = '';
             }
+            this.props.setHasEmbedState(false);
             return null;
         }
 
@@ -115,11 +116,13 @@ export default class PostBody extends React.Component {
                 post.props.oEmbedLink = trimmedLink;
                 post.type = 'oEmbed';
                 this.setState({post, provider});
+                this.props.setHasEmbedState(false);
                 return '';
             }
         }
 
         if (YoutubeVideo.isYoutubeLink(link)) {
+            this.props.setHasEmbedState(true);
             return (
                 <YoutubeVideo
                     channelId={post.channel_id}
@@ -132,10 +135,12 @@ export default class PostBody extends React.Component {
             const imageType = Constants.IMAGE_TYPES[i];
             const suffix = link.substring(link.length - (imageType.length + 1));
             if (suffix === '.' + imageType || suffix === '=' + imageType) {
+                this.props.setHasEmbedState(true);
                 return this.createImageEmbed(link, this.state.imgLoaded);
             }
         }
 
+        this.props.setHasEmbedState(false);
         return null;
     }
 
@@ -305,7 +310,11 @@ export default class PostBody extends React.Component {
                         provider={this.state.provider}
                     />
                     {fileAttachmentHolder}
-                    {this.embed}
+                    <div className='post__embed-container'
+                        hidden={!this.props.embedVisible}
+                    >
+                        {this.embed}
+                    </div>
                 </div>
             </div>
         );
@@ -316,5 +325,7 @@ PostBody.propTypes = {
     post: React.PropTypes.object.isRequired,
     parentPost: React.PropTypes.object,
     retryPost: React.PropTypes.func.isRequired,
-    handleCommentClick: React.PropTypes.func.isRequired
+    handleCommentClick: React.PropTypes.func.isRequired,
+    embedVisible: React.PropTypes.bool,
+    setHasEmbedState: React.PropTypes.func
 };

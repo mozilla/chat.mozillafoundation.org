@@ -222,6 +222,15 @@ export default class PostInfo extends React.Component {
                         eventTime={post.create_at}
                     />
                 </li>
+                <li className='col col__embed-visibility'>
+                   {this.props.hasEmbed ?
+                    <a className='post__embed-visibility'
+                        data-expanded={this.props.embedVisible}
+                        aria-label='Toggle Embed Visibility'
+                        onClick={this.props.toggleEmbedVisibility}
+                    >
+                    </a> : ''}
+                </li>
                 <li className='col col__reply'>
                     <div
                         className='dropdown'
@@ -258,5 +267,8 @@ PostInfo.propTypes = {
     commentCount: React.PropTypes.number,
     isLastComment: React.PropTypes.bool,
     allowReply: React.PropTypes.string,
-    handleCommentClick: React.PropTypes.func
+    handleCommentClick: React.PropTypes.func,
+    hasEmbed: React.PropTypes.bool,
+    embedVisible: React.PropTypes.bool,
+    toggleEmbedVisibility: React.PropTypes.func
 };
