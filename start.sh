@@ -30,6 +30,9 @@ export ENABLE_TEAM_CREATION=`echo ${ENABLE_TEAM_CREATION} | tr -d \"`
 export ENABLE_USER_CREATION=${ENABLE_USER_CREATION:=false}
 export ENABLE_USER_CREATION=`echo ${ENABLE_USER_CREATION} | tr -d \"`
 
+export ENABLE_OUTGOING_WEBHOOKS=${ENABLE_OUTGOING_WEBHOOKS:=false}
+export ENABLE_OUTGOING_WEBHOOKS=`echo ${ENABLE_OUTGOING_WEBHOOKS} | tr -d \"`
+
 lib/envsubst < config/config-heroku-template.json > config/config-heroku.json
 
 bin/platform -config=config/config-heroku.json
