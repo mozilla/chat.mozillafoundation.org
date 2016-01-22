@@ -18,10 +18,15 @@ export default class Post extends React.Component {
         super(props);
 
         this.handleCommentClick = this.handleCommentClick.bind(this);
+        this.toggleEmbedVisibility = this.toggleEmbedVisibility.bind(this);
+        this.setHasEmbedState = this.setHasEmbedState.bind(this);
         this.forceUpdateInfo = this.forceUpdateInfo.bind(this);
         this.retryPost = this.retryPost.bind(this);
 
-        this.state = {};
+        this.state = {
+            embedVisible: true,
+            hasEmbed: false
+        };
     }
     handleCommentClick(e) {
         e.preventDefault();
@@ -39,6 +44,12 @@ export default class Post extends React.Component {
             type: ActionTypes.RECEIVED_SEARCH,
             results: null
         });
+    }
+    toggleEmbedVisibility() {
+        this.setState({embedVisible: !this.state.embedVisible});
+    }
+    setHasEmbedState(val) {
+        this.setState({hasEmbed: val});
     }
     forceUpdateInfo() {
         this.refs.info.forceUpdate();
@@ -74,7 +85,7 @@ export default class Post extends React.Component {
         PostStore.updatePendingPost(post);
         this.forceUpdate();
     }
-    shouldComponentUpdate(nextProps) {
+    shouldComponentUpdate(nextProps, nextState) {
         if (!utils.areObjectsEqual(nextProps.post, this.props.post)) {
             return true;
         }
@@ -99,6 +110,13 @@ export default class Post extends React.Component {
             return true;
         }
 
+        if (nextState.embedVisible !== this.state.embedVisible) {
+            return true;
+        }
+
+        if (nextState.hasEmbed !== this.state.hasEmbed) {
+            return true;
+        }
         return false;
     }
     getCommentCount(props) {
@@ -214,7 +232,10 @@ export default class Post extends React.Component {
                                 commentCount={commentCount}
                                 handleCommentClick={this.handleCommentClick}
                                 isLastComment={this.props.isLastComment}
-                                sameUser={this.props.sameUser}
+                                embedVisible={this.state.embedVisible}
+sameUser={this.props.sameUser} 
+                                toggleEmbedVisibility={this.toggleEmbedVisibility}
+                                hasEmbed={this.state.hasEmbed}
                             />
                             <PostBody
                                 post={post}
@@ -223,6 +244,8 @@ export default class Post extends React.Component {
                                 posts={posts}
                                 handleCommentClick={this.handleCommentClick}
                                 retryPost={this.retryPost}
+                                setHasEmbedState={this.setHasEmbedState}
+                                embedVisible={this.state.embedVisible}
                             />
                         </div>
                     </div>
