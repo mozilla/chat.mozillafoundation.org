@@ -27,6 +27,7 @@ var (
 		"echoCommand":     "/echo",
 		"shrugCommand":    "/shrug",
 		"meCommand":       "/me",
+		"msgCommand":      "/msg",
 	}
 	commands = []commandHandler{
 		logoutCommand,
@@ -35,6 +36,7 @@ var (
 		echoCommand,
 		shrugCommand,
 		meCommand,
+		msgCommand,
 	}
 	commandNotImplementedErr = model.NewAppError("checkCommand", "Command not implemented", "")
 )
@@ -249,6 +251,78 @@ func shrugCommand(c *Context, command *model.Command) bool {
 
 	} else if strings.Index(cmd, command.Command) == 0 {
 		command.AddSuggestion(&model.SuggestCommand{Suggestion: cmd, Description: "Adds ¯\\_(ツ)_/¯ to your message, /shrug [message]"})
+	}
+
+	return false
+}
+
+func msgCommand(c *Context, command *model.Command) bool {
+
+	cmd := cmds["msgCommand"]
+
+	if strings.Index(command.Command, cmd) == 0 {
+
+		parts := strings.Split(command.Command, " ")
+		parsedUserName := ""
+		parsedMessage := ""
+
+		if len(parts) >= 2 {
+			parsedUserName = parts[1]
+		}
+		if len(parts) >= 3 {
+			parsedMessage = strings.SplitAfterN(command.Command, " ", 3)[2]
+		}
+
+		if profileList := <-Srv.Store.User().GetProfiles(c.Session.TeamId); profileList.Err != nil {
+			c.Err = profileList.Err
+			return false
+		} else {
+			profileUsers := profileList.Data.(map[string]*model.User)
+
+			for _, userProfile := range profileUsers {
+				//Don't let users open DMs with themselves. It probably won't work out well.
+				if userProfile.Id == c.Session.UserId {
+					continue
+				}
+
+				if userProfile.Username == parsedUserName && !command.Suggest {
+					targetChannelId := ""
+
+					//Find the channel based on this user
+					channelName := model.GetDMNameFromIds(c.Session.UserId,userProfile.Id)
+					if channel := <-Srv.Store.Channel().GetByName(c.Session.TeamId, channelName); channel.Err != nil {
+						//If targetChannelId is blank, channel needs to be created
+						if directChannel, err := CreateDirectChannel(c, userProfile.Id); err != nil {
+							c.Err = err
+						} else {
+							targetChannelId = directChannel.Id
+						}
+					} else {
+						targetChannelId = channel.Data.(*model.Channel).Id
+					}
+
+					makeDirectChannelVisible(c.Session.TeamId, targetChannelId)
+					command.GotoLocation = c.GetTeamURL() + "/channels/" + channelName
+					if len(parsedMessage) > 0 {
+						post := &model.Post{}
+						post.Message = parsedMessage
+						post.ChannelId = targetChannelId
+						if _, err := CreatePost(c, post, false); err != nil {
+							l4g.Error("Unable to create post, err=%v", err)
+							return false
+						}
+						command.Response = model.RESP_EXECUTED
+					}
+					return true
+				}
+
+				if (len(parsedUserName) == 0 || strings.Index(userProfile.Username, parsedUserName) == 0) && len(parts) < 3 {
+					command.AddSuggestion(&model.SuggestCommand{Suggestion: cmd + " " + userProfile.Username, Description: "Message " + userProfile.Username})
+				}
+			}
+		}
+	} else if strings.Index(cmd, command.Command) == 0 {
+		command.AddSuggestion(&model.SuggestCommand{Suggestion: cmd, Description: "Send a direct message to a user"})
 	}
 
 	return false
