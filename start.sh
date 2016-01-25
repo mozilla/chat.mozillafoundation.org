@@ -39,6 +39,12 @@ export ENABLE_POST_USERNAME_OVERRIDE=`echo ${ENABLE_POST_USERNAME_OVERRIDE} | tr
 export ENABLE_POST_ICON_OVERRIDE=${ENABLE_POST_ICON_OVERRIDE:=false}
 export ENABLE_POST_ICON_OVERRIDE=`echo ${ENABLE_POST_ICON_OVERRIDE} | tr -d \"`
 
+export ENABLE_TEAM_LISTING=${ENABLE_TEAM_LISTING:=false}
+export ENABLE_TEAM_LISTING=`echo ${ENABLE_TEAM_LISTING} | tr -d \"`
+
+export SEND_PUSH_NOTIFICATIONS=${SEND_PUSH_NOTIFICATIONS:=false}
+export SEND_PUSH_NOTIFICATIONS=`echo ${SEND_PUSH_NOTIFICATIONS} | tr -d \"`
+
 lib/envsubst < config/config-heroku-template.json > config/config-heroku.json
 
 bin/platform -config=config/config-heroku.json

@@ -14,10 +14,11 @@
     },
     "TeamSettings": {
         "SiteName": "${TEAM_SETTINGS__SITE_NAME}",
-        "MaxUsersPerTeam": 50,
+        "MaxUsersPerTeam": ${MAX_USERS_PER_TEAM},
         "EnableTeamCreation": ${ENABLE_TEAM_CREATION},
         "EnableUserCreation": ${ENABLE_USER_CREATION},
-        "RestrictCreationToDomains": ""
+        "RestrictCreationToDomains": "${RESTRICT_CREATION_TO_DOMAINS}",
+        "EnableTeamListing": ${ENABLE_TEAM_LISTING}
     },
     "SqlSettings": {
         "DriverName": "postgres",
@@ -68,14 +69,16 @@
         "PasswordResetSalt": "${EMAIL_SETTINGS__PASSWORD_RESET_SALT}",
         "ApplePushServer": "",
         "ApplePushCertPublic": "",
-        "ApplePushCertPrivate": ""
+        "ApplePushCertPrivate": "",
+        "SendPushNotifications": ${SEND_PUSH_NOTIFICATIONS},
+        "PushNotificationServer": "${PUSH_NOTIFICATION_SERVER}"
     },
     "RateLimitSettings": {
         "EnableRateLimiter": true,
         "PerSec": 10,
         "MemoryStoreSize": 10000,
         "VaryByRemoteAddr": true,
-        "VaryByHeader": ""
+        "VaryByHeader": "${VARY_BY_HEADER}"
     },
     "PrivacySettings": {
         "ShowEmailAddress": true,
