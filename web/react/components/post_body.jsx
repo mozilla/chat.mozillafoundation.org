@@ -350,6 +350,13 @@ class PostBody extends React.Component {
                         provider={this.state.provider}
                     />
                     {fileAttachmentHolder}
+                    {this.props.hasEmbed && Utils.isFeatureEnabled(PreReleaseFeatures.EMBED_TOGGLE) ?
+                    <a className='post__embed-visibility'
+                        data-expanded={this.props.embedVisible}
+                        aria-label='Toggle Embed Visibility'
+                        onClick={this.props.toggleEmbedVisibility}
+                    >
+                    </a> : ''}
             <div className='post__embed-container'
                 hidden={!this.props.embedVisible}
             >
@@ -368,7 +375,9 @@ PostBody.propTypes = {
     retryPost: React.PropTypes.func.isRequired,
     handleCommentClick: React.PropTypes.func.isRequired,
     embedVisible: React.PropTypes.bool,
-    setHasEmbedState: React.PropTypes.func
+    setHasEmbedState: React.PropTypes.func,
+    hasEmbed: React.PropTypes.bool,
+    toggleEmbedVisibility: React.PropTypes.func
 };
 
 export default injectIntl(PostBody);

@@ -233,7 +233,7 @@ export default class Post extends React.Component {
                                 handleCommentClick={this.handleCommentClick}
                                 isLastComment={this.props.isLastComment}
                                 embedVisible={this.state.embedVisible}
-sameUser={this.props.sameUser} 
+                                sameUser={this.props.sameUser}
                                 toggleEmbedVisibility={this.toggleEmbedVisibility}
                                 hasEmbed={this.state.hasEmbed}
                             />
@@ -245,6 +245,8 @@ sameUser={this.props.sameUser}
                                 handleCommentClick={this.handleCommentClick}
                                 retryPost={this.retryPost}
                                 setHasEmbedState={this.setHasEmbedState}
+                                toggleEmbedVisibility={this.toggleEmbedVisibility}
+                                hasEmbed={this.state.hasEmbed}
                                 embedVisible={this.state.embedVisible}
                             />
                         </div>

@@ -463,11 +463,6 @@ body.ios {
 				.post__time {
 					@include opacity(0.5);
 				}
-
-				.post__embed-visibility{
-					margin-left: 0;
-					@include opacity(1);
-				}
 			}
 
 			.post__header {
@@ -498,17 +493,6 @@ body.ios {
 				left: -7px;
 				font-size: 11px;
 				line-height: 37px;
-				@include opacity(0);
-			}
-
-			.post__embed-visibility {
-				display: inline-block;
-				position: absolute;
-				left: 0px;
-				top: -3px;
-				height: 30px;
-				line-height: 37px;
-				font-size: 14px;
 				@include opacity(0);
 			}
 		}
@@ -778,14 +762,14 @@ body.ios {
 
 	.post__embed-visibility {
 		cursor: pointer;
-		display: inline-block;
+		display: block;
 		font: normal normal normal 14px/1 FontAwesome;
 		text-rendering: auto;
 		-webkit-font-smoothing: antialiased;
 		-moz-osx-font-smoothing: grayscale;
 		font-size: 0;
 		width: 30px;
-		margin-left: .5em;
+		margin-top: -5px;
 
 		&:hover{
 			text-decoration: none;
@@ -801,7 +785,7 @@ body.ios {
 		}
 	}
 
-	.post__time, .post__embed-visibility {
+	.post__time{
 		font-size: 0.9em;
 	}
 
