@@ -73,6 +73,12 @@ func StartServer() {
 		handler = th.Throttle(&CorsWrapper{Srv.Router})
 	}
 
+	if utils.Cfg.ServiceSettings.EnableHSTS == true {
+		l4g.Info("HSTS Headers Enabled")
+
+		handler = utils.NewHSTS(handler, *utils.Cfg.ServiceSettings.HSTSMaxAge, *utils.Cfg.ServiceSettings.HSTSIncludeSubDomains)
+	}
+
 	go func() {
 		err := manners.ListenAndServe(utils.Cfg.ServiceSettings.ListenAddress, handlers.RecoveryHandler(handlers.PrintRecoveryStack(true))(handler))
 		if err != nil {
