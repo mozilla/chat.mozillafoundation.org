@@ -12,6 +12,7 @@
         "EnableTesting": false,
         "EnableDeveloper": false,
         "EnableSecurityFixAlert": true,
+        "EnableHSTS": false,
         "SessionLengthWebInDays" : 30,
         "SessionLengthMobileInDays" : 30,
         "SessionLengthSSOInDays" : 30,
