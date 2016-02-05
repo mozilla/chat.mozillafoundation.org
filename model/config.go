@@ -60,6 +60,9 @@ type ServiceSettings struct {
 	WebsocketSecurePort               *int
 	WebsocketPort                     *int
 	WebserverMode                     *string
+	EnableHSTS                        bool
+	HSTSMaxAge                        *int
+	HSTSIncludeSubDomains             *bool
 }
 
 type SSOSettings struct {
@@ -447,7 +450,6 @@ func (o *Config) SetDefaults() {
 		o.ServiceSettings.SessionCacheInMinutes = new(int)
 		*o.ServiceSettings.SessionCacheInMinutes = 10
 	}
-
 	if o.ServiceSettings.EnableCommands == nil {
 		o.ServiceSettings.EnableCommands = new(bool)
 		*o.ServiceSettings.EnableCommands = false
@@ -506,6 +508,16 @@ func (o *Config) SetDefaults() {
 	if o.LdapSettings.NicknameAttribute == nil {
 		o.LdapSettings.NicknameAttribute = new(string)
 		*o.LdapSettings.NicknameAttribute = ""
+	}
+
+	if o.ServiceSettings.HSTSMaxAge == nil {
+		o.ServiceSettings.HSTSMaxAge = new(int)
+		*o.ServiceSettings.HSTSMaxAge = 2592000
+	}
+
+	if o.ServiceSettings.HSTSIncludeSubDomains == nil {
+		o.ServiceSettings.HSTSIncludeSubDomains = new(bool)
+		*o.ServiceSettings.HSTSIncludeSubDomains = false
 	}
 }
 
