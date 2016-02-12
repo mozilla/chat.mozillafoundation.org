@@ -289,7 +289,7 @@ func msgCommand(c *Context, command *model.Command) bool {
 					targetChannelId := ""
 
 					//Find the channel based on this user
-					channelName := model.GetDMNameFromIds(c.Session.UserId,userProfile.Id)
+					channelName := model.GetDMNameFromIds(c.Session.UserId, userProfile.Id)
 					if channel := <-Srv.Store.Channel().GetByName(c.Session.TeamId, channelName); channel.Err != nil {
 						//If targetChannelId is blank, channel needs to be created
 						if directChannel, err := CreateDirectChannel(c, userProfile.Id); err != nil {
