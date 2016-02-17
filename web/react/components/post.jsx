@@ -175,7 +175,6 @@ export default class Post extends React.Component {
         }
 
         const userProfile = UserStore.getProfile(post.user_id);
-        let userName = Utils.displayUsername(userProfile.id);
 
         let timestamp = UserStore.getCurrentUser().update_at;
         if (userProfile) {
@@ -218,7 +217,7 @@ export default class Post extends React.Component {
         }
 
         return (
-            <div className={'post__wrapper ' + userName}>
+            <div>
                 <div
                     id={'post_' + post.id}
                     className={'post ' + sameUserClass + ' ' + rootUser + ' ' + postType + ' ' + currentUserCss + ' ' + shouldHighlightClass + ' ' + systemMessageClass}
