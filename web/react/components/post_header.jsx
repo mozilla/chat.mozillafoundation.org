@@ -50,6 +50,9 @@ export default class PostHeader extends React.Component {
                         post={post}
                         commentCount={this.props.commentCount}
                         handleCommentClick={this.props.handleCommentClick}
+                        toggleEmbedVisibility={this.props.toggleEmbedVisibility}
+                        embedVisible={this.props.embedVisible}
+                        hasEmbed={this.props.hasEmbed}
                         allowReply='true'
                         isLastComment={this.props.isLastComment}
                         sameUser={this.props.sameUser}
@@ -71,5 +74,8 @@ PostHeader.propTypes = {
     commentCount: React.PropTypes.number,
     isLastComment: React.PropTypes.bool,
     handleCommentClick: React.PropTypes.func,
-    sameUser: React.PropTypes.bool
+    toggleEmbedVisibility: React.PropTypes.func,
+    embedVisible: React.PropTypes.bool,
+    sameUser: React.PropTypes.bool,
+    hasEmbed: React.PropTypes.bool
 };

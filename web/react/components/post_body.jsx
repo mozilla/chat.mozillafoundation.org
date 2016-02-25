@@ -73,7 +73,7 @@ class PostBody extends React.Component {
     }
 
     componentWillMount() {
-        if (this.props.post.filenames.length === 0 && this.state.links && this.state.links.length > 0) {
+        if (this.props.post.filenames.length === 0 && this.state.links && this.state.links.length > 0 && this.props.embedVisible) {
             this.embed = this.createEmbed(this.state.links[0]);
         }
     }
@@ -102,7 +102,7 @@ class PostBody extends React.Component {
 
     componentWillReceiveProps(nextProps) {
         const linkData = Utils.extractLinks(nextProps.post.message);
-        if (this.props.post.filenames.length === 0 && this.state.links && this.state.links.length > 0) {
+        if (this.props.post.filenames.length === 0 && this.state.links && this.state.links.length > 0 && this.props.embedVisible) {
             this.embed = this.createEmbed(linkData.links[0]);
         }
         this.setState({
@@ -118,6 +118,7 @@ class PostBody extends React.Component {
                 post.props.oEmbedLink = '';
                 post.type = '';
             }
+            this.props.setHasEmbedState(false);
             return null;
         }
 
@@ -129,11 +130,13 @@ class PostBody extends React.Component {
                 post.props.oEmbedLink = trimmedLink;
                 post.type = 'oEmbed';
                 this.setState({post, provider});
+                this.props.setHasEmbedState(false);
                 return '';
             }
         }
 
         if (YoutubeVideo.isYoutubeLink(link)) {
+            this.props.setHasEmbedState(true);
             return (
                 <YoutubeVideo
                     channelId={post.channel_id}
@@ -146,10 +149,12 @@ class PostBody extends React.Component {
             const imageType = Constants.IMAGE_TYPES[i];
             const suffix = link.substring(link.length - (imageType.length + 1));
             if (suffix === '.' + imageType || suffix === '=' + imageType) {
+                this.props.setHasEmbedState(true);
                 return this.createImageEmbed(link, this.state.imgLoaded);
             }
         }
 
+        this.props.setHasEmbedState(false);
         return null;
     }
 
@@ -345,7 +350,18 @@ class PostBody extends React.Component {
                         provider={this.state.provider}
                     />
                     {fileAttachmentHolder}
-                    {this.embed}
+                    {this.props.hasEmbed && Utils.isFeatureEnabled(PreReleaseFeatures.EMBED_TOGGLE) ?
+                    <a className='post__embed-visibility'
+                        data-expanded={this.props.embedVisible}
+                        aria-label='Toggle Embed Visibility'
+                        onClick={this.props.toggleEmbedVisibility}
+                    >
+                    </a> : ''}
+            <div className='post__embed-container'
+                hidden={!this.props.embedVisible}
+            >
+             {this.embed}
+            </div>
                 </div>
             </div>
         );
@@ -357,7 +373,11 @@ PostBody.propTypes = {
     post: React.PropTypes.object.isRequired,
     parentPost: React.PropTypes.object,
     retryPost: React.PropTypes.func.isRequired,
-    handleCommentClick: React.PropTypes.func.isRequired
+    handleCommentClick: React.PropTypes.func.isRequired,
+    embedVisible: React.PropTypes.bool,
+    setHasEmbedState: React.PropTypes.func,
+    hasEmbed: React.PropTypes.bool,
+    toggleEmbedVisibility: React.PropTypes.func
 };
 
 export default injectIntl(PostBody);
