@@ -65,6 +65,7 @@ func (me *msgProvider) DoCommand(c *Context, channelId string, message string) *
 				if channel := <-Srv.Store.Channel().GetByName(c.Session.TeamId, channelName); channel.Err != nil {
 					if directChannel, err := CreateDirectChannel(c, userProfile.Id); err != nil {
 						c.Err = err
+						return &model.CommandResponse{Text: c.T("api.command_msg.dm_fail.app_error"), ResponseType: model.COMMAND_RESPONSE_TYPE_EPHEMERAL}
 					} else {
 						targetChannelId = directChannel.Id
 					}
@@ -77,7 +78,7 @@ func (me *msgProvider) DoCommand(c *Context, channelId string, message string) *
 					post := &model.Post{}
 					post.Message = parsedMessage
 					post.ChannelId = targetChannelId
-					if _, err := CreatePost(c, post, false); err != nil {
+					if _, err := CreatePost(c, post, true); err != nil {
 						return &model.CommandResponse{Text: c.T("api.command_msg.fail.app_error"), ResponseType: model.COMMAND_RESPONSE_TYPE_EPHEMERAL}
 					}
 				}

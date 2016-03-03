@@ -317,15 +317,19 @@
   },
   {
     "id": "api.command_msg.desc",
-    "translation": "Message a user"
+    "translation": "Send Direct Message to a user"
   },
   {
     "id": "api.command_msg.fail.app_error",
     "translation": "An error occured while messaging the user."
   },
   {
+    "id": "api.command_msg.dm_fail.app_error",
+    "translation": "An error occured while creating the direct message."
+  },
+  {
     "id": "api.command_msg.hint",
-    "translation": "[user-name]"
+    "translation": "@[username] 'message'"
   },
   {
     "id": "api.command_msg.list.app_error",
