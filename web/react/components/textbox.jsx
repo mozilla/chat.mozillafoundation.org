@@ -170,7 +170,6 @@ export default class Textbox extends React.Component {
                     type='textarea'
                     spellCheck='true'
                     autoComplete='off'
-                    autoCorrect='off'
                     rows='1'
                     maxLength={Constants.MAX_POST_LEN}
                     placeholder={this.props.createMessage}
