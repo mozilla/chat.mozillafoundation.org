@@ -74,6 +74,7 @@ type ServiceSettings struct {
 	EnableCustomEmoji                 *bool
 	RestrictCustomEmojiCreation       *string
 	EnableHSTS                        bool
+	UpgradeHTTP                       bool
 	HSTSMaxAge                        *int
 	HSTSIncludeSubDomains             *bool
 }
