@@ -79,6 +79,12 @@ func StartServer() {
 		handler = utils.NewHSTS(handler, *utils.Cfg.ServiceSettings.HSTSMaxAge, *utils.Cfg.ServiceSettings.HSTSIncludeSubDomains)
 	}
 
+	if utils.Cfg.ServiceSettings.UpgradeHTTP == true {
+		l4g.Info("HTTP Upgrading Enabled")
+
+		handler = utils.NewHTTPS(handler)
+	}
+
 	go func() {
 		err := manners.ListenAndServe(utils.Cfg.ServiceSettings.ListenAddress, handlers.RecoveryHandler(handlers.PrintRecoveryStack(true))(handler))
 		if err != nil {

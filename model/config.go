@@ -71,6 +71,7 @@ type ServiceSettings struct {
 	WebsocketPort                     *int
 	WebserverMode                     *string
 	EnableHSTS                        bool
+	UpgradeHTTP                       bool
 	HSTSMaxAge                        *int
 	HSTSIncludeSubDomains             *bool
 }

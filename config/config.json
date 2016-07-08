@@ -15,6 +15,7 @@
         "EnableDeveloper": false,
         "EnableSecurityFixAlert": true,
         "EnableHSTS": false,
+        "UpgradeHTTP": true,
         "EnableInsecureOutgoingConnections": false,
         "EnableMultifactorAuthentication": false,
         "AllowCorsFrom": "",
