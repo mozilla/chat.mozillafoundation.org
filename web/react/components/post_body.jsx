@@ -296,7 +296,7 @@ export default class PostBody extends React.Component {
                     <div
                         key={`${post.id}_message`}
                         id={`${post.id}_message`}
-                        className={postClass}
+’                       className={postClass}
                     >
                         {loading}
                         <span
